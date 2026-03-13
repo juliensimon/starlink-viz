@@ -90,6 +90,7 @@ export default function Satellites() {
     }
 
     console.log(`Loaded ${count} satellites`);
+    useAppStore.getState().setSatellitesLoaded(true);
   }, [tleData]);
 
   // Update connected satellite color

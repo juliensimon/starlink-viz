@@ -21,6 +21,11 @@ export function setSatrecObjects(satrecs: SatRec[]): void {
   satrecObjects = satrecs;
 }
 
+/** Get the full TLE data catalog */
+export function getTLEData(): TLEData[] {
+  return tleData;
+}
+
 /** Get the total number of satellites */
 export function getSatelliteCount(): number {
   return tleData.length;

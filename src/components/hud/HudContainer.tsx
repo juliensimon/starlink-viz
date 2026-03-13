@@ -34,18 +34,18 @@ export default function HudContainer() {
         <SatelliteInfoPanel />
       </div>
 
-      {/* Bottom-left: Telemetry */}
-      <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 pointer-events-auto">
+      {/* Bottom-left: Telemetry (hidden on small screens) */}
+      <div className="hidden md:block absolute bottom-4 left-4 md:bottom-6 md:left-6 pointer-events-auto">
         <TelemetryPanel />
       </div>
 
-      {/* Bottom-right: Handoff */}
-      <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-auto">
+      {/* Bottom-right: Handoff (hidden on small screens) */}
+      <div className="hidden md:block absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-auto">
         <HandoffPanel />
       </div>
 
-      {/* Bottom-center: Event log */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+      {/* Bottom-center: Event log (hidden on small screens) */}
+      <div className="hidden sm:block absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
         <EventLog />
       </div>
     </div>
