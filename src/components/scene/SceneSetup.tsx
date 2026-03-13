@@ -1,9 +1,65 @@
 'use client';
 
+import { useRef, useCallback, useEffect } from 'react';
+import { useThree, useFrame } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import * as THREE from 'three';
 
 export default function SceneSetup() {
+  const { camera, gl } = useThree();
+  const raycaster = useRef(new THREE.Raycaster());
+  const mouse = useRef(new THREE.Vector2());
+  const targetLookAt = useRef<THREE.Vector3 | null>(null);
+  const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
+  const animProgress = useRef(1); // 1 = done
+
+  const handleDoubleClick = useCallback(
+    (e: MouseEvent) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.current.setFromCamera(mouse.current, camera);
+
+      // Create a globe sphere for intersection testing
+      const globeSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1);
+      const hitPoint = new THREE.Vector3();
+      const ray = raycaster.current.ray;
+
+      if (ray.intersectSphere(globeSphere, hitPoint)) {
+        targetLookAt.current = hitPoint.clone();
+        animProgress.current = 0;
+      }
+    },
+    [camera, gl]
+  );
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+    canvas.addEventListener('dblclick', handleDoubleClick);
+    return () => {
+      canvas.removeEventListener('dblclick', handleDoubleClick);
+    };
+  }, [gl, handleDoubleClick]);
+
+  useFrame((_state, delta) => {
+    if (targetLookAt.current && animProgress.current < 1) {
+      animProgress.current = Math.min(1, animProgress.current + delta * 2); // ~500ms
+      currentLookAt.current.lerp(targetLookAt.current, animProgress.current);
+
+      // Smoothly move camera to look at the target point
+      const dir = currentLookAt.current.clone().normalize();
+      const dist = camera.position.length();
+      camera.position.copy(dir.multiplyScalar(dist));
+      camera.lookAt(0, 0, 0);
+
+      if (animProgress.current >= 1) {
+        targetLookAt.current = null;
+      }
+    }
+  });
+
   return (
     <>
       {/* Lighting */}

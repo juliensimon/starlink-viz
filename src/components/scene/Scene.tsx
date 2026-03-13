@@ -9,6 +9,7 @@ import Satellites from './Satellites';
 import DishMarker from './DishMarker';
 import GroundStations from './GroundStations';
 import ConnectionBeam from './ConnectionBeam';
+import SatelliteTooltip from './SatelliteTooltip';
 
 export default function Scene() {
   return (
@@ -24,6 +25,7 @@ export default function Scene() {
       <DishMarker />
       <GroundStations />
       <ConnectionBeam />
+      <SatelliteTooltip />
       <SceneSetup />
     </Canvas>
   );
