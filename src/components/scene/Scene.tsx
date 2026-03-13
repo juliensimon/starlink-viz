@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import Globe from './Globe';
 import Atmosphere from './Atmosphere';
 import SceneSetup from './SceneSetup';
+import Satellites from './Satellites';
 
 export default function Scene() {
   return (
@@ -16,6 +17,7 @@ export default function Scene() {
     >
       <Globe />
       <Atmosphere />
+      <Satellites />
       <SceneSetup />
     </Canvas>
   );
