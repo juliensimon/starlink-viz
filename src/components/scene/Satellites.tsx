@@ -13,11 +13,12 @@ import {
 import { useAppStore } from '@/stores/app-store';
 import type { SatRec } from '@/lib/satellites/propagator';
 
+// Propagate 1 batch per frame across NUM_BATCHES frames for a full cycle
 const NUM_BATCHES = 6;
 const DIM_COLOR = new THREE.Color('#1a6b8a');
 const BRIGHT_COLOR = new THREE.Color('#00ffff');
 
-// Reusable objects for setting instance transforms
+// Reusable — never allocate in render loop
 const tempObject = new THREE.Object3D();
 
 export default function Satellites() {
@@ -31,11 +32,8 @@ export default function Satellites() {
   const connectedSatelliteIndex = useAppStore((s) => s.connectedSatelliteIndex);
   const { camera } = useThree();
 
-  // Maximum satellites we support (CelesTrak currently has ~10000 Starlink sats)
-  const maxCount = 12000;
-
-  // Geometry and material (memoized)
-  const geometry = useMemo(() => new THREE.IcosahedronGeometry(0.003, 1), []);
+  // Geometry: minimal icosahedron for each satellite dot
+  const geometry = useMemo(() => new THREE.IcosahedronGeometry(0.003, 0), []);
   const material = useMemo(
     () => new THREE.MeshBasicMaterial({ vertexColors: false, color: '#1a6b8a' }),
     []
@@ -100,7 +98,6 @@ export default function Satellites() {
     const mesh = meshRef.current;
     if (!colors || !mesh || !mesh.instanceColor) return;
 
-    // Reset previous connected satellite to dim
     if (prevConnectedRef.current !== null) {
       const pi = prevConnectedRef.current * 3;
       colors[pi] = DIM_COLOR.r;
@@ -108,7 +105,6 @@ export default function Satellites() {
       colors[pi + 2] = DIM_COLOR.b;
     }
 
-    // Highlight new connected satellite
     if (connectedSatelliteIndex !== null) {
       const ci = connectedSatelliteIndex * 3;
       colors[ci] = BRIGHT_COLOR.r;
@@ -129,7 +125,7 @@ export default function Satellites() {
 
     if (!satrecs.length || !positions || !mesh || count === 0) return;
 
-    const now = new Date(); // Date allocation is unavoidable for satellite.js API
+    const now = new Date();
     const batchSize = Math.ceil(count / NUM_BATCHES);
     const batchIdx = batchIndexRef.current;
     const startIdx = batchIdx * batchSize;
@@ -139,8 +135,7 @@ export default function Satellites() {
       propagateBatch(satrecs, now, startIdx, batchCount, positions);
     }
 
-    // Update transforms for the batch that was just propagated
-    // Also apply occlusion based on camera direction
+    // Camera occlusion direction
     const camLen = camera.position.length();
     const camNormX = camera.position.x / camLen;
     const camNormY = camera.position.y / camLen;
@@ -155,19 +150,19 @@ export default function Satellites() {
 
       tempObject.position.set(x, y, z);
 
-      // Occlusion: if satellite is on the far side of globe relative to camera
-      // Use dot product of satellite position with camera position vector
       const dot = x * camNormX + y * camNormY + z * camNormZ;
-      const isOccluded = dot < -0.2;
-      // Also hide satellites at origin (propagation failures)
-      const isInvalid = x === 0 && y === 0 && z === 0;
-
-      tempObject.scale.setScalar(isOccluded || isInvalid ? 0 : 1);
+      const hide = dot < -0.2 || (x === 0 && y === 0 && z === 0);
+      tempObject.scale.setScalar(hide ? 0 : 1);
       tempObject.updateMatrix();
       mesh.setMatrixAt(i, tempObject.matrix);
     }
 
-    mesh.instanceMatrix.needsUpdate = true;
+    // Partial buffer update — only upload the modified range, not the full buffer
+    const attr = mesh.instanceMatrix;
+    attr.clearUpdateRanges();
+    attr.addUpdateRange(startIdx * 16, batchCount * 16);
+    attr.needsUpdate = true;
+
     batchIndexRef.current = (batchIdx + 1) % NUM_BATCHES;
   }, [camera]);
 
@@ -175,10 +170,13 @@ export default function Satellites() {
 
   if (loading || !tleData) return null;
 
+  // Allocate exactly what we need — avoids wasting GPU memory on unused slots
+  const instanceCount = tleData.length;
+
   return (
     <instancedMesh
       ref={meshRef}
-      args={[geometry, material, maxCount]}
+      args={[geometry, material, instanceCount]}
       frustumCulled={false}
     />
   );
