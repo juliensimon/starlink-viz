@@ -10,6 +10,9 @@ export interface DishStatus {
   obstructions: number;
   azimuth: number;
   elevation: number;
+  dropRate: number;
+  deviceId: string;
+  softwareVersion: string;
 }
 
 export interface EventLogEntry {

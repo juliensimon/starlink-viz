@@ -1,6 +1,6 @@
 'use client';
 
-import { useDishStatus } from '@/hooks/useDishStatus';
+import { useTelemetryStore } from '@/stores/telemetry-store';
 import { useAppStore } from '@/stores/app-store';
 import { formatDegrees } from '@/lib/utils/formatting';
 
@@ -43,11 +43,11 @@ function CompassIndicator({ azimuth }: { azimuth: number }) {
 }
 
 export default function SatelliteInfoPanel() {
-  const { status } = useDishStatus();
+  const status = useTelemetryStore((s) => s.dishStatus);
   const connectedSatelliteIndex = useAppStore((s) => s.connectedSatelliteIndex);
 
-  const azimuth = status?.boresightAzimuth ?? 0;
-  const elevation = status?.boresightElevation ?? 0;
+  const azimuth = status?.azimuth ?? 0;
+  const elevation = status?.elevation ?? 0;
   const hasConnection = connectedSatelliteIndex !== null;
 
   return (
