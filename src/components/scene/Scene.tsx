@@ -6,6 +6,9 @@ import Globe from './Globe';
 import Atmosphere from './Atmosphere';
 import SceneSetup from './SceneSetup';
 import Satellites from './Satellites';
+import DishMarker from './DishMarker';
+import GroundStations from './GroundStations';
+import ConnectionBeam from './ConnectionBeam';
 
 export default function Scene() {
   return (
@@ -18,6 +21,9 @@ export default function Scene() {
       <Globe />
       <Atmosphere />
       <Satellites />
+      <DishMarker />
+      <GroundStations />
+      <ConnectionBeam />
       <SceneSetup />
     </Canvas>
   );

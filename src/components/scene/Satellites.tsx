@@ -8,6 +8,7 @@ import { initSatelliteRecords, propagateBatch } from '@/lib/satellites/propagato
 import {
   setTLEData,
   setSatrecObjects,
+  setPositionsArray,
 } from '@/lib/satellites/satellite-store';
 import { useAppStore } from '@/stores/app-store';
 import type { SatRec } from '@/lib/satellites/propagator';
@@ -51,7 +52,9 @@ export default function Satellites() {
 
     const count = satrecs.length;
     countRef.current = count;
-    positionsRef.current = new Float32Array(count * 3);
+    const posArr = new Float32Array(count * 3);
+    positionsRef.current = posArr;
+    setPositionsArray(posArr);
 
     // Initialize colors
     const colors = new Float32Array(count * 3);
