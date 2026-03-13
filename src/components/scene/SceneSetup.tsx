@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -8,34 +8,9 @@ import * as THREE from 'three';
 
 export default function SceneSetup() {
   const { camera, gl } = useThree();
-  // Patch Firefox bug: getContextAttributes() returns null, crashing EffectComposer.
-  // We monkey-patch it to return a sensible default so postprocessing works everywhere.
-  const [postProcessingOk, setPostProcessingOk] = useState(false);
-  useEffect(() => {
-    try {
-      const ctx = gl.getContext();
-      if (!ctx) return;
-      const original = ctx.getContextAttributes.bind(ctx);
-      const attrs = original();
-      if (attrs === null) {
-        ctx.getContextAttributes = () => ({
-          alpha: true,
-          antialias: true,
-          depth: true,
-          failIfMajorPerformanceCaveat: false,
-          powerPreference: 'default' as WebGLPowerPreference,
-          premultipliedAlpha: true,
-          preserveDrawingBuffer: false,
-          stencil: true,
-          desynchronized: false,
-          xrCompatible: false,
-        });
-      }
-      setPostProcessingOk(true);
-    } catch {
-      // Postprocessing not available
-    }
-  }, [gl]);
+  // Postprocessing is always enabled — Firefox getContextAttributes() null bug
+  // is patched globally in Scene.tsx at module level.
+  const postProcessingOk = true;
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
   const targetLookAt = useRef<THREE.Vector3 | null>(null);
