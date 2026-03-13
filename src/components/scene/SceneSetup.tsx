@@ -8,16 +8,17 @@ import * as THREE from 'three';
 
 export default function SceneSetup() {
   const { camera, gl } = useThree();
-  // Check if postprocessing is safe (WebGL context might be limited in headless browsers)
+  // Check if postprocessing is safe (context must support getContextAttributes)
   const [postProcessingOk, setPostProcessingOk] = useState(false);
   useEffect(() => {
     try {
       const ctx = gl.getContext();
-      if (ctx && ctx.getParameter(ctx.VERSION)) {
+      const attrs = ctx?.getContextAttributes?.();
+      if (ctx && attrs) {
         setPostProcessingOk(true);
       }
     } catch {
-      // Postprocessing not available
+      // Postprocessing not available (headless browser, etc.)
     }
   }, [gl]);
   const raycaster = useRef(new THREE.Raycaster());
