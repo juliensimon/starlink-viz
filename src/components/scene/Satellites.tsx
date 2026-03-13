@@ -13,6 +13,8 @@ import {
 import { useAppStore } from '@/stores/app-store';
 import type { SatRec } from '@/lib/satellites/propagator';
 
+// Cap satellite count — Firefox WebGL2 loses context with 10K instances
+const MAX_SATELLITES = 5000;
 // Propagate 1 batch per frame across NUM_BATCHES frames for a full cycle
 const NUM_BATCHES = 6;
 const DIM_COLOR = new THREE.Color('#1a6b8a');
@@ -43,8 +45,10 @@ export default function Satellites() {
   useEffect(() => {
     if (!tleData || tleData.length === 0) return;
 
-    setTLEData(tleData);
-    const satrecs = initSatelliteRecords(tleData);
+    // Limit TLE data to avoid overwhelming Firefox WebGL2
+    const limitedTle = tleData.length > MAX_SATELLITES ? tleData.slice(0, MAX_SATELLITES) : tleData;
+    setTLEData(limitedTle);
+    const satrecs = initSatelliteRecords(limitedTle);
     setSatrecObjects(satrecs);
     satrecsRef.current = satrecs;
 
@@ -170,8 +174,7 @@ export default function Satellites() {
 
   if (loading || !tleData) return null;
 
-  // Allocate exactly what we need — avoids wasting GPU memory on unused slots
-  const instanceCount = tleData.length;
+  const instanceCount = Math.min(tleData.length, MAX_SATELLITES);
 
   return (
     <instancedMesh
