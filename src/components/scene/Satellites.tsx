@@ -129,7 +129,7 @@ export default function Satellites() {
 
     if (!satrecs.length || !positions || !mesh || count === 0) return;
 
-    const now = new Date();
+    const now = new Date(); // Date allocation is unavoidable for satellite.js API
     const batchSize = Math.ceil(count / NUM_BATCHES);
     const batchIdx = batchIndexRef.current;
     const startIdx = batchIdx * batchSize;
@@ -141,9 +141,10 @@ export default function Satellites() {
 
     // Update transforms for the batch that was just propagated
     // Also apply occlusion based on camera direction
-    const cameraDir = new THREE.Vector3();
-    camera.getWorldDirection(cameraDir);
-    const cameraPos = camera.position.clone().normalize();
+    const camLen = camera.position.length();
+    const camNormX = camera.position.x / camLen;
+    const camNormY = camera.position.y / camLen;
+    const camNormZ = camera.position.z / camLen;
 
     const batchEnd = Math.min(startIdx + batchCount, count);
     for (let i = startIdx; i < batchEnd; i++) {
@@ -156,7 +157,7 @@ export default function Satellites() {
 
       // Occlusion: if satellite is on the far side of globe relative to camera
       // Use dot product of satellite position with camera position vector
-      const dot = x * cameraPos.x + y * cameraPos.y + z * cameraPos.z;
+      const dot = x * camNormX + y * camNormY + z * camNormZ;
       const isOccluded = dot < -0.2;
       // Also hide satellites at origin (propagation failures)
       const isInvalid = x === 0 && y === 0 && z === 0;

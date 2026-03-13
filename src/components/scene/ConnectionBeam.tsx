@@ -28,7 +28,8 @@ const DISH_POS = (() => {
 })();
 
 const PARTICLE_COUNT = 60;
-const BEAM_CURVE_SEGMENTS = 50;
+const BEAM_SEGMENTS = 50;
+const BEAM_VERTS = BEAM_SEGMENTS + 1;
 
 // Precompute ground station 3D positions
 const gsPositions = GROUND_STATIONS.map((gs) => {
@@ -36,9 +37,18 @@ const gsPositions = GROUND_STATIONS.map((gs) => {
   return new THREE.Vector3(x, y, z);
 });
 
-/**
- * Find the nearest ground station to a satellite position (in 3D).
- */
+// Reusable temp vectors (avoid per-frame allocations)
+const _satPos = new THREE.Vector3();
+const _mid = new THREE.Vector3();
+const _control = new THREE.Vector3();
+const _point = new THREE.Vector3();
+const _dishNormal = DISH_POS.clone().normalize();
+const _east = new THREE.Vector3();
+const _north = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _satDir = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+
 function findNearestGS3D(satPos: THREE.Vector3): THREE.Vector3 {
   let nearest = gsPositions[0];
   let minDist = Infinity;
@@ -52,10 +62,6 @@ function findNearestGS3D(satPos: THREE.Vector3): THREE.Vector3 {
   return nearest;
 }
 
-/**
- * Find connected satellite: the satellite closest to the boresight direction
- * from the dish position using azimuth/elevation.
- */
 function findConnectedSatellite(
   azimuthDeg: number,
   elevationDeg: number
@@ -64,59 +70,86 @@ function findConnectedSatellite(
   const count = getSatelliteCount();
   if (!positions || count === 0) return null;
 
-  // Convert azimuth/elevation to a direction vector from dish position
   const az = degToRad(azimuthDeg);
   const el = degToRad(elevationDeg);
 
-  // Boresight direction in local tangent plane (ENU), then rotate to world
-  // We approximate by computing a target point along the boresight ray
-  const dishNormal = DISH_POS.clone().normalize();
+  _east.crossVectors(_up, _dishNormal).normalize();
+  if (_east.lengthSq() < 0.001) _east.set(1, 0, 0);
+  _north.crossVectors(_dishNormal, _east).normalize();
 
-  // Local east and north vectors at dish location
-  const up = new THREE.Vector3(0, 1, 0);
-  const east = new THREE.Vector3().crossVectors(up, dishNormal).normalize();
-  if (east.lengthSq() < 0.001) {
-    east.set(1, 0, 0);
-  }
-  const north = new THREE.Vector3().crossVectors(dishNormal, east).normalize();
-
-  // Direction in world coordinates
   const cosEl = Math.cos(el);
-  const dir = new THREE.Vector3()
-    .addScaledVector(east, Math.sin(az) * cosEl)
-    .addScaledVector(north, Math.cos(az) * cosEl)
-    .addScaledVector(dishNormal, Math.sin(el))
+  _dir.set(0, 0, 0)
+    .addScaledVector(_east, Math.sin(az) * cosEl)
+    .addScaledVector(_north, Math.cos(az) * cosEl)
+    .addScaledVector(_dishNormal, Math.sin(el))
     .normalize();
 
-  // Find satellite closest to this direction (from dish position)
   let bestIdx = -1;
   let bestDot = -Infinity;
 
-  const satDir = new THREE.Vector3();
   for (let i = 0; i < count; i++) {
     const idx = i * 3;
     const x = positions[idx];
     const y = positions[idx + 1];
     const z = positions[idx + 2];
-
-    // Skip invalid satellites at origin
     if (x === 0 && y === 0 && z === 0) continue;
 
-    satDir.set(x - DISH_POS.x, y - DISH_POS.y, z - DISH_POS.z).normalize();
-    const dot = satDir.dot(dir);
-
+    _satDir.set(x - DISH_POS.x, y - DISH_POS.y, z - DISH_POS.z).normalize();
+    const dot = _satDir.dot(_dir);
     if (dot > bestDot) {
       bestDot = dot;
       bestIdx = i;
     }
   }
 
-  // Only accept if reasonably close to boresight direction
-  if (bestIdx >= 0 && bestDot > 0.9) {
-    return bestIdx;
-  }
+  return bestIdx >= 0 && bestDot > 0.9 ? bestIdx : null;
+}
 
-  return null;
+/**
+ * Write bezier curve points into a pre-allocated Float32Array.
+ * No allocations per call.
+ */
+function writeCurvePoints(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  lift: number,
+  outArray: Float32Array,
+  segments: number
+) {
+  _mid.addVectors(start, end).multiplyScalar(0.5);
+  const midDist = _mid.length();
+  _control.copy(_mid).normalize().multiplyScalar(Math.max(midDist * lift, lift));
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    // Quadratic bezier: (1-t)²·start + 2(1-t)t·control + t²·end
+    const omt = 1 - t;
+    const omt2 = omt * omt;
+    const t2 = t * t;
+    const twoOmtT = 2 * omt * t;
+    const idx = i * 3;
+    outArray[idx] = omt2 * start.x + twoOmtT * _control.x + t2 * end.x;
+    outArray[idx + 1] = omt2 * start.y + twoOmtT * _control.y + t2 * end.y;
+    outArray[idx + 2] = omt2 * start.z + twoOmtT * _control.z + t2 * end.z;
+  }
+}
+
+/**
+ * Get a point on the bezier for particle positioning.
+ */
+function bezierPoint(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  t: number,
+  out: THREE.Vector3
+) {
+  // Reuse the _control that was last set by writeCurvePoints for the dish beam
+  const omt = 1 - t;
+  out.set(
+    omt * omt * start.x + 2 * omt * t * _control.x + t * t * end.x,
+    omt * omt * start.y + 2 * omt * t * _control.y + t * t * end.y,
+    omt * omt * start.z + 2 * omt * t * _control.z + t * t * end.z
+  );
 }
 
 export default function ConnectionBeam() {
@@ -124,9 +157,11 @@ export default function ConnectionBeam() {
   const setConnectedSatellite = useAppStore((s) => s.setConnectedSatellite);
   const dishStatus = useTelemetryStore((s) => s.dishStatus);
 
-  // Create THREE objects imperatively to avoid JSX <line> vs SVG conflict
+  // Pre-allocate beam geometry buffers (dish beam)
   const beamLine = useMemo(() => {
+    const posArray = new Float32Array(BEAM_VERTS * 3);
     const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     const mat = new THREE.LineBasicMaterial({
       color: new THREE.Color('#00ffff'),
       transparent: true,
@@ -137,8 +172,11 @@ export default function ConnectionBeam() {
     return new THREE.Line(geo, mat);
   }, []);
 
+  // Pre-allocate ground station beam geometry
   const gsBeamLine = useMemo(() => {
+    const posArray = new Float32Array(BEAM_VERTS * 3);
     const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     const mat = new THREE.LineBasicMaterial({
       color: new THREE.Color('#1a6baa'),
       transparent: true,
@@ -149,6 +187,7 @@ export default function ConnectionBeam() {
     return new THREE.Line(geo, mat);
   }, []);
 
+  // Pre-allocate particle geometry
   const particles = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute(
@@ -167,7 +206,7 @@ export default function ConnectionBeam() {
     return new THREE.Points(geo, mat);
   }, []);
 
-  const particleTRef = useRef<Float32Array>(new Float32Array(PARTICLE_COUNT));
+  const particleTRef = useRef(new Float32Array(PARTICLE_COUNT));
 
   // Handoff animation state
   const opacityRef = useRef(1);
@@ -175,7 +214,11 @@ export default function ConnectionBeam() {
   const handoffTimeRef = useRef(0);
   const isHandingOffRef = useRef(false);
 
-  // Initialize particle t values evenly distributed
+  // Store last dish-to-sat curve control point for particle bezier
+  const lastDishCurveStartRef = useRef(DISH_POS);
+  const lastDishCurveEndRef = useRef(new THREE.Vector3());
+  const lastControlRef = useRef(new THREE.Vector3());
+
   useEffect(() => {
     const tValues = particleTRef.current;
     for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -188,7 +231,6 @@ export default function ConnectionBeam() {
   useEffect(() => {
     if (!dishStatus) return;
     const now = Date.now();
-    // Throttle to every 500ms
     if (now - lastUpdateRef.current < 500) return;
     lastUpdateRef.current = now;
 
@@ -212,74 +254,60 @@ export default function ConnectionBeam() {
     prevConnectedRef.current = connectedSatelliteIndex;
   }, [connectedSatelliteIndex]);
 
-  // Build bezier curve between two points with outward control point
-  const buildCurve = useCallback(
-    (start: THREE.Vector3, end: THREE.Vector3, lift: number = 1.3) => {
-      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-      const midDir = mid.clone().normalize();
-      const midDist = mid.length();
-      const control = midDir.multiplyScalar(Math.max(midDist * lift, lift));
-      return new THREE.QuadraticBezierCurve3(start, control, end);
-    },
-    []
-  );
-
   useFrame((_, delta) => {
     const positions = getPositionsArray();
     if (connectedSatelliteIndex === null || !positions) return;
 
     const idx = connectedSatelliteIndex * 3;
-    const satX = positions[idx];
-    const satY = positions[idx + 1];
-    const satZ = positions[idx + 2];
+    _satPos.set(positions[idx], positions[idx + 1], positions[idx + 2]);
 
     // Skip if satellite is at origin (invalid)
-    if (satX === 0 && satY === 0 && satZ === 0) return;
-
-    const satPos = new THREE.Vector3(satX, satY, satZ);
+    if (_satPos.x === 0 && _satPos.y === 0 && _satPos.z === 0) return;
 
     // Handoff animation
     if (isHandingOffRef.current) {
       handoffTimeRef.current += delta;
-      const t = Math.min(handoffTimeRef.current / 0.5, 1); // 500ms fade-in
+      const t = Math.min(handoffTimeRef.current / 0.5, 1);
       opacityRef.current = t;
-      if (t >= 1) {
-        isHandingOffRef.current = false;
-      }
+      if (t >= 1) isHandingOffRef.current = false;
     } else {
       opacityRef.current = 1;
     }
 
     const opacity = opacityRef.current;
 
-    // Update dish-to-satellite beam
-    const dishCurve = buildCurve(DISH_POS, satPos, 1.3);
-    const curvePoints = dishCurve.getPoints(BEAM_CURVE_SEGMENTS);
-
-    beamLine.geometry.setFromPoints(curvePoints);
+    // Update dish-to-satellite beam (writes into pre-allocated buffer)
+    const beamPosAttr = beamLine.geometry.getAttribute('position') as THREE.BufferAttribute;
+    writeCurvePoints(DISH_POS, _satPos, 1.3, beamPosAttr.array as Float32Array, BEAM_SEGMENTS);
+    beamPosAttr.needsUpdate = true;
     (beamLine.material as THREE.LineBasicMaterial).opacity = 0.4 * opacity;
 
-    // Update particles
+    // Save control point for particle bezier
+    lastDishCurveEndRef.current.copy(_satPos);
+    lastControlRef.current.copy(_control);
+
+    // Update particles along dish beam
     const tValues = particleTRef.current;
-    const posAttr = particles.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const posArray = posAttr.array as Float32Array;
+    const particlePosAttr = particles.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const particleArray = particlePosAttr.array as Float32Array;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       tValues[i] = (tValues[i] + delta * 0.5) % 1.0;
-      const point = dishCurve.getPoint(tValues[i]);
-      posArray[i * 3] = point.x;
-      posArray[i * 3 + 1] = point.y;
-      posArray[i * 3 + 2] = point.z;
+      const t = tValues[i];
+      const omt = 1 - t;
+      const pi = i * 3;
+      particleArray[pi] = omt * omt * DISH_POS.x + 2 * omt * t * _control.x + t * t * _satPos.x;
+      particleArray[pi + 1] = omt * omt * DISH_POS.y + 2 * omt * t * _control.y + t * t * _satPos.y;
+      particleArray[pi + 2] = omt * omt * DISH_POS.z + 2 * omt * t * _control.z + t * t * _satPos.z;
     }
-    posAttr.needsUpdate = true;
+    particlePosAttr.needsUpdate = true;
     (particles.material as THREE.PointsMaterial).opacity = 0.7 * opacity;
 
     // Update satellite-to-ground-station beam
-    const nearestGS = findNearestGS3D(satPos);
-    const gsCurve = buildCurve(satPos, nearestGS, 1.2);
-    const gsPoints = gsCurve.getPoints(BEAM_CURVE_SEGMENTS);
-
-    gsBeamLine.geometry.setFromPoints(gsPoints);
+    const nearestGS = findNearestGS3D(_satPos);
+    const gsPosAttr = gsBeamLine.geometry.getAttribute('position') as THREE.BufferAttribute;
+    writeCurvePoints(_satPos, nearestGS, 1.2, gsPosAttr.array as Float32Array, BEAM_SEGMENTS);
+    gsPosAttr.needsUpdate = true;
     (gsBeamLine.material as THREE.LineBasicMaterial).opacity = 0.2 * opacity;
   });
 
