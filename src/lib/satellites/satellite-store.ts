@@ -9,6 +9,7 @@ import type { SatRec } from './propagator';
 let tleData: TLEData[] = [];
 let satrecObjects: SatRec[] = [];
 let connectedIndex: number | null = null;
+let positionsArray: Float32Array | null = null;
 
 /** Set the TLE data catalog */
 export function setTLEData(data: TLEData[]): void {
@@ -43,4 +44,14 @@ export function setConnectedIndex(index: number | null): void {
 /** Get the connected satellite index */
 export function getConnectedIndex(): number | null {
   return connectedIndex;
+}
+
+/** Set the shared satellite positions Float32Array */
+export function setPositionsArray(positions: Float32Array): void {
+  positionsArray = positions;
+}
+
+/** Get the shared satellite positions Float32Array */
+export function getPositionsArray(): Float32Array | null {
+  return positionsArray;
 }
