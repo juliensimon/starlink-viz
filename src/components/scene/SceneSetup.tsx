@@ -8,17 +8,32 @@ import * as THREE from 'three';
 
 export default function SceneSetup() {
   const { camera, gl } = useThree();
-  // Check if postprocessing is safe (context must support getContextAttributes)
+  // Patch Firefox bug: getContextAttributes() returns null, crashing EffectComposer.
+  // We monkey-patch it to return a sensible default so postprocessing works everywhere.
   const [postProcessingOk, setPostProcessingOk] = useState(false);
   useEffect(() => {
     try {
       const ctx = gl.getContext();
-      const attrs = ctx?.getContextAttributes?.();
-      if (ctx && attrs) {
-        setPostProcessingOk(true);
+      if (!ctx) return;
+      const original = ctx.getContextAttributes.bind(ctx);
+      const attrs = original();
+      if (attrs === null) {
+        ctx.getContextAttributes = () => ({
+          alpha: true,
+          antialias: true,
+          depth: true,
+          failIfMajorPerformanceCaveat: false,
+          powerPreference: 'default' as WebGLPowerPreference,
+          premultipliedAlpha: true,
+          preserveDrawingBuffer: false,
+          stencil: true,
+          desynchronized: false,
+          xrCompatible: false,
+        });
       }
+      setPostProcessingOk(true);
     } catch {
-      // Postprocessing not available (headless browser, etc.)
+      // Postprocessing not available
     }
   }, [gl]);
   const raycaster = useRef(new THREE.Raycaster());
