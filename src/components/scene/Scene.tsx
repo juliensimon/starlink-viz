@@ -16,7 +16,7 @@ export default function Scene() {
     <Canvas
       camera={{ position: [0, 0, 3], fov: 45 }}
       style={{ width: '100vw', height: '100vh' }}
-      gl={{ antialias: true, alpha: false }}
+      gl={{ antialias: true }}
       scene={{ background: new THREE.Color('#0a0e1a') }}
     >
       <Globe />
