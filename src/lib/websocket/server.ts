@@ -11,14 +11,14 @@ export function createWSServer(httpServer: HTTPServer): WebSocketServer {
 
   httpServer.on('upgrade', (request, socket, head) => {
     // Only handle WebSocket upgrades for /ws path
+    // Let all other upgrades (e.g. Next.js HMR/Turbopack) pass through
     const url = new URL(request.url || '/', `http://${request.headers.host}`);
     if (url.pathname === '/ws') {
       wss!.handleUpgrade(request, socket, head, (ws) => {
         wss!.emit('connection', ws, request);
       });
-    } else {
-      socket.destroy();
     }
+    // Do NOT destroy non-/ws sockets — Next.js needs them for HMR
   });
 
   wss.on('connection', (ws) => {

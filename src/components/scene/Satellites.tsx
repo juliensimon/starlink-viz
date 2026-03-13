@@ -31,8 +31,8 @@ export default function Satellites() {
   const connectedSatelliteIndex = useAppStore((s) => s.connectedSatelliteIndex);
   const { camera } = useThree();
 
-  // Maximum satellites we support
-  const maxCount = 7000;
+  // Maximum satellites we support (CelesTrak currently has ~10000 Starlink sats)
+  const maxCount = 12000;
 
   // Geometry and material (memoized)
   const geometry = useMemo(() => new THREE.IcosahedronGeometry(0.003, 1), []);

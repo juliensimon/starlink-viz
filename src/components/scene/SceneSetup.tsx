@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -8,6 +8,18 @@ import * as THREE from 'three';
 
 export default function SceneSetup() {
   const { camera, gl } = useThree();
+  // Check if postprocessing is safe (WebGL context might be limited in headless browsers)
+  const [postProcessingOk, setPostProcessingOk] = useState(false);
+  useEffect(() => {
+    try {
+      const ctx = gl.getContext();
+      if (ctx && ctx.getParameter(ctx.VERSION)) {
+        setPostProcessingOk(true);
+      }
+    } catch {
+      // Postprocessing not available
+    }
+  }, [gl]);
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
   const targetLookAt = useRef<THREE.Vector3 | null>(null);
@@ -88,14 +100,16 @@ export default function SceneSetup() {
         speed={0.5}
       />
 
-      {/* Post-processing */}
-      <EffectComposer>
-        <Bloom
-          luminanceThreshold={0.8}
-          intensity={0.5}
-          mipmapBlur
-        />
-      </EffectComposer>
+      {/* Post-processing (skipped if WebGL context is limited) */}
+      {postProcessingOk && (
+        <EffectComposer>
+          <Bloom
+            luminanceThreshold={0.8}
+            intensity={0.5}
+            mipmapBlur
+          />
+        </EffectComposer>
+      )}
     </>
   );
 }

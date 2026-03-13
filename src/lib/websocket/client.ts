@@ -48,6 +48,9 @@ export function useWebSocket(): UseWebSocketReturn {
               obstructions: status.obstructionPercentTime,
               azimuth: status.boresightAzimuth,
               elevation: status.boresightElevation,
+              dropRate: status.popPingDropRate,
+              deviceId: status.deviceId,
+              softwareVersion: status.softwareVersion,
             });
 
             // Push to history ring buffer

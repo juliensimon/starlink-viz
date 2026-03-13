@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useDishStatus } from '@/hooks/useDishStatus';
+import { useTelemetryStore } from '@/stores/telemetry-store';
 import { formatUptime } from '@/lib/utils/formatting';
 
 const stateColors: Record<string, string> = {
@@ -17,7 +17,8 @@ const stateColorForDot = (state: string): string => {
 };
 
 export default function StatusBar() {
-  const { status, connected } = useDishStatus();
+  const status = useTelemetryStore((s) => s.dishStatus);
+  const connected = status !== null;
   const [uptimeOffset, setUptimeOffset] = useState(0);
 
   // Tick uptime locally every second
@@ -35,7 +36,7 @@ export default function StatusBar() {
 
   const state = status?.state ?? 'UNKNOWN';
   const uptime = (status?.uptime ?? 0) + uptimeOffset;
-  const dropRate = status?.popPingDropRate ?? 0;
+  const dropRate = status?.dropRate ?? 0;
   const quality = Math.max(0, Math.round((1 - dropRate) * 100));
   const deviceId = status?.deviceId ?? '---';
   const softwareVersion = status?.softwareVersion ?? '---';
