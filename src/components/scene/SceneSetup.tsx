@@ -3,14 +3,10 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
 export default function SceneSetup() {
   const { camera, gl } = useThree();
-  // Postprocessing is always enabled — Firefox getContextAttributes() null bug
-  // is patched globally in Scene.tsx at module level.
-  const postProcessingOk = true;
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
   const targetLookAt = useRef<THREE.Vector3 | null>(null);
@@ -25,7 +21,6 @@ export default function SceneSetup() {
 
       raycaster.current.setFromCamera(mouse.current, camera);
 
-      // Create a globe sphere for intersection testing
       const globeSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1);
       const hitPoint = new THREE.Vector3();
       const ray = raycaster.current.ray;
@@ -48,10 +43,9 @@ export default function SceneSetup() {
 
   useFrame((_state, delta) => {
     if (targetLookAt.current && animProgress.current < 1) {
-      animProgress.current = Math.min(1, animProgress.current + delta * 2); // ~500ms
+      animProgress.current = Math.min(1, animProgress.current + delta * 2);
       currentLookAt.current.lerp(targetLookAt.current, animProgress.current);
 
-      // Smoothly move camera to look at the target point
       const dir = currentLookAt.current.clone().normalize();
       const dist = camera.position.length();
       camera.position.copy(dir.multiplyScalar(dist));
@@ -65,11 +59,9 @@ export default function SceneSetup() {
 
   return (
     <>
-      {/* Lighting */}
       <ambientLight intensity={0.15} />
       <directionalLight position={[5, 3, 5]} intensity={1.8} />
 
-      {/* Camera controls */}
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
@@ -80,7 +72,6 @@ export default function SceneSetup() {
         autoRotateSpeed={0.3}
       />
 
-      {/* Star field background */}
       <Stars
         radius={100}
         depth={50}
@@ -90,17 +81,6 @@ export default function SceneSetup() {
         fade
         speed={0.5}
       />
-
-      {/* Post-processing (skipped if WebGL context is limited) */}
-      {postProcessingOk && (
-        <EffectComposer>
-          <Bloom
-            luminanceThreshold={0.8}
-            intensity={0.5}
-            mipmapBlur
-          />
-        </EffectComposer>
-      )}
     </>
   );
 }
