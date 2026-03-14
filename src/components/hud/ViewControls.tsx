@@ -1,15 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppStore } from '@/stores/app-store';
+import { useAppStore, DEMO_LOCATIONS } from '@/stores/app-store';
 
 export default function ViewControls() {
   const autoRotate = useAppStore((s) => s.autoRotate);
   const setAutoRotate = useAppStore((s) => s.setAutoRotate);
   const altitudeFilter = useAppStore((s) => s.altitudeFilter);
   const setAltitudeFilter = useAppStore((s) => s.setAltitudeFilter);
+  const islPrediction = useAppStore((s) => s.islPrediction);
+  const setISLPrediction = useAppStore((s) => s.setISLPrediction);
   const focusDish = useAppStore((s) => s.focusDish);
   const demoMode = useAppStore((s) => s.demoMode);
+  const demoLocation = useAppStore((s) => s.demoLocation);
+  const setDemoLocation = useAppStore((s) => s.setDemoLocation);
   const [switching, setSwitching] = useState(false);
 
   const toggleMode = async () => {
@@ -21,7 +25,10 @@ export default function ViewControls() {
         body: JSON.stringify({ mode: demoMode ? 'live' : 'demo' }),
       });
       const data = await res.json();
-      useAppStore.getState().setDemoMode(data.mode === 'demo');
+      const isDemo = data.mode === 'demo';
+      useAppStore.getState().setDemoMode(isDemo);
+      // Clear demo location when switching to live mode
+      if (!isDemo) setDemoLocation(null);
     } catch {
       // Will be reported via event log
     }
@@ -108,6 +115,56 @@ export default function ViewControls() {
           <div className="text-[9px] text-white/45 leading-tight">Per-shell altitude filtering</div>
         </div>
       </button>
+
+      {/* ISL Prediction toggle */}
+      <button
+        onClick={() => setISLPrediction(!islPrediction)}
+        className="flex items-center gap-2 w-full text-left mb-2 group"
+      >
+        <div
+          className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
+            islPrediction ? 'bg-green-500/40 justify-end' : 'bg-white/10 justify-start'
+          }`}
+        >
+          <div
+            className={`w-2.5 h-2.5 rounded-full mx-0.5 transition-colors duration-200 ${
+              islPrediction ? 'bg-green-400' : 'bg-white/40'
+            }`}
+          />
+        </div>
+        <div>
+          <span className="text-[11px] text-white/70 group-hover:text-white/90 transition-colors">
+            ISL Prediction
+          </span>
+          <div className="text-[9px] text-white/45 leading-tight">Laser link route estimation</div>
+        </div>
+      </button>
+
+      {/* Demo location selector — ISL showcase */}
+      {demoMode && islPrediction && (
+        <div className="mb-2">
+          <select
+            value={demoLocation?.name ?? ''}
+            onChange={(e) => {
+              const loc = DEMO_LOCATIONS.find((l) => l.name === e.target.value) ?? null;
+              setDemoLocation(loc);
+            }}
+            className="w-full bg-black/60 border border-green-500/30 rounded text-[11px] text-white/80 px-2 py-1.5 outline-none focus:border-green-500/60 appearance-none cursor-pointer"
+          >
+            <option value="">Dish location (default)</option>
+            {DEMO_LOCATIONS.map((loc) => (
+              <option key={loc.name} value={loc.name}>
+                {loc.name}
+              </option>
+            ))}
+          </select>
+          {demoLocation && (
+            <div className="text-[9px] text-green-400/60 mt-1 leading-tight">
+              {demoLocation.description}
+            </div>
+          )}
+        </div>
+      )}
 
       <hr className="hud-divider my-2" />
 
