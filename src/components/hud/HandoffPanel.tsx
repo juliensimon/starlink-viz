@@ -172,7 +172,10 @@ export default function HandoffPanel() {
             <span className="text-white/30 text-right">%</span>
             {shellStats.map((s) => {
               const yearTooltip = s.years.length > 0
-                ? s.years.map((y) => `${y.year}: ${y.operational} op / ${y.total} total`).join('\n')
+                ? s.years.map((y) => {
+                    const pct = y.total > 0 ? Math.round((y.operational / y.total) * 100) : 0;
+                    return `${y.year}: ${y.operational} / ${y.total} operational (${pct}%)`;
+                  }).join('\n')
                 : 'No satellites launched';
               return (
                 <div key={s.label} className="contents cursor-default" title={yearTooltip}>
