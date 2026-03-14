@@ -20,6 +20,24 @@ let fullCatalogInclinations: Float32Array | null = null;
 let fullCatalogAltitudes: Float32Array | null = null;
 let fullCatalogLaunchYears: Uint16Array | null = null;
 
+// ISL augmentation arrays
+let raanArray: Float32Array | null = null;
+let islCapableArray: Uint8Array | null = null;
+
+// Current ISL route
+export interface RoutePath {
+  type: 'direct' | 'isl';
+  satelliteIndices: number[];
+  groundStationIndex: number;
+  latencyMs: number;
+  hopCount: number;
+}
+
+let currentRoute: RoutePath | null = null;
+
+// Detected PoP (Point of Presence) — set from /api/pop response
+let detectedPop: string | null = null;
+
 /** Set the TLE data catalog */
 export function setTLEData(data: TLEData[]): void {
   tleData = data;
@@ -111,6 +129,46 @@ export function setFullCatalog(count: number, inclinations: Float32Array, altitu
 /** Get full catalog data for shell statistics */
 export function getFullCatalog(): { count: number; inclinations: Float32Array | null; altitudes: Float32Array | null; launchYears: Uint16Array | null } {
   return { count: fullCatalogCount, inclinations: fullCatalogInclinations, altitudes: fullCatalogAltitudes, launchYears: fullCatalogLaunchYears };
+}
+
+/** Set the RAAN array */
+export function setRAANArray(raans: Float32Array): void {
+  raanArray = raans;
+}
+
+/** Get the RAAN array */
+export function getRAANArray(): Float32Array | null {
+  return raanArray;
+}
+
+/** Set the ISL capability array */
+export function setISLCapableArray(capable: Uint8Array): void {
+  islCapableArray = capable;
+}
+
+/** Get the ISL capability array */
+export function getISLCapableArray(): Uint8Array | null {
+  return islCapableArray;
+}
+
+/** Set the current ISL route */
+export function setCurrentRoute(route: RoutePath | null): void {
+  currentRoute = route;
+}
+
+/** Get the current ISL route */
+export function getCurrentRoute(): RoutePath | null {
+  return currentRoute;
+}
+
+/** Set the detected PoP */
+export function setDetectedPop(pop: string | null): void {
+  detectedPop = pop;
+}
+
+/** Get the detected PoP */
+export function getDetectedPop(): string | null {
+  return detectedPop;
 }
 
 /** Get NORAD catalog ID from TLE line 1 */
