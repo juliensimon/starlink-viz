@@ -1,6 +1,6 @@
 # starlink-viz
 
-Real-time 3D visualization of the Starlink satellite constellation, built with Next.js, React Three Fiber, and live dish telemetry. Every orbital position, Sun/Moon placement, and ground station location is computed from publicly available data sources — as accurate as possible without access to SpaceX internals.
+Real-time 3D Starlink satellite tracker and mission control dashboard. Track every satellite in the SpaceX Starlink constellation, monitor live dish telemetry, visualize ground stations, and watch satellite handoffs — all computed from publicly available data. Built with Next.js, React Three Fiber, and Three.js.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![Three.js](https://img.shields.io/badge/Three.js-0.183-049EF4)
