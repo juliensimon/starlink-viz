@@ -8,7 +8,7 @@ Real-time 3D Starlink satellite tracker and mission control dashboard. Track eve
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![satellite.js](https://img.shields.io/badge/SGP4-satellite.js-orange)
-![Satellites](https://img.shields.io/badge/satellites-7%2C500%2B-blueviolet)
+![Satellites](https://img.shields.io/badge/satellites-~10%2C000-blueviolet)
 ![Ground Stations](https://img.shields.io/badge/gateways-204-ff9933)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -16,7 +16,7 @@ Real-time 3D Starlink satellite tracker and mission control dashboard. Track eve
 
 ## What it does
 
-- **7,500+ Starlink satellites** propagated in real time using SGP4 orbital mechanics across 5 orbital shells
+- **~10,000 Starlink satellites** propagated in real time using SGP4 orbital mechanics across 5 orbital shells
 - **GPS constellation** tracked alongside Starlink with hover identification
 - **Live dish telemetry** from a real Starlink dish via gRPC (or demo mode with simulated data)
 - **Astronomically accurate Sun and Moon** with real-time positioning, lens flare, and natural lunar phases
