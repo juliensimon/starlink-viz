@@ -13,7 +13,10 @@ import {
   setInclinationsArray,
   getInclinationsArray,
   setFullCatalog,
+  setRAANArray,
+  setISLCapableArray,
 } from '@/lib/satellites/satellite-store';
+import { computeISLArrays } from '@/lib/satellites/isl-capability';
 import { useAppStore } from '@/stores/app-store';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 import { DISH_POS, azElToDirection } from '@/lib/utils/dish-frame';
@@ -132,6 +135,12 @@ export default function Satellites() {
     }
     setFullCatalog(totalCount, allInclinations, allAltitudes, allLaunchYears);
 
+    // Compute ISL capability and RAAN for the full catalog
+    const tleLines2 = tleData.map((t) => t.line2);
+    const { raanArray: fullRaans, islCapableArray: fullIsl } = computeISLArrays(
+      tleLines2, allInclinations, allLaunchYears, totalCount,
+    );
+
     let filteredTle = tleData;
     let filteredSatrecs = allSatrecs;
 
@@ -168,6 +177,19 @@ export default function Satellites() {
       inclinations[i] = isNaN(inc) ? 53 : inc;
     }
     setInclinationsArray(inclinations);
+
+    // Build RAAN + ISL arrays for the filtered set
+    const filteredLines2 = filteredTle.map((t) => t.line2);
+    const filteredLaunchYears = new Uint16Array(count);
+    for (let i = 0; i < count; i++) {
+      const yy = parseInt(filteredTle[i].line1.substring(9, 11), 10);
+      filteredLaunchYears[i] = isNaN(yy) ? 0 : (yy >= 57 ? 1900 + yy : 2000 + yy);
+    }
+    const { raanArray: filteredRaans, islCapableArray: filteredIsl } = computeISLArrays(
+      filteredLines2, inclinations, filteredLaunchYears, count,
+    );
+    setRAANArray(filteredRaans);
+    setISLCapableArray(filteredIsl);
 
     // Initial propagation
     propagateBatch(filteredSatrecs, now, 0, count, posArr);
