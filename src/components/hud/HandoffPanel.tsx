@@ -7,11 +7,18 @@ import { getFullCatalog } from '@/lib/satellites/satellite-store';
 import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
 import { isOperationalAltitude } from '@/lib/config';
 
+interface YearBreakdown {
+  year: number;
+  operational: number;
+  total: number;
+}
+
 interface ShellStats {
   label: string;
   color: string;
   total: number;
   operational: number;
+  years: YearBreakdown[];
 }
 
 // Ascending inclination order for display
@@ -80,23 +87,38 @@ export default function HandoffPanel() {
   const [tleAge, setTleAge] = useState(() => formatTleAge(tleLastFetched));
 
   const computeShellStats = useCallback(() => {
-    const { count, inclinations, altitudes } = getFullCatalog();
-    if (!inclinations || !altitudes || count === 0) return;
+    const { count, inclinations, altitudes, launchYears } = getFullCatalog();
+    if (!inclinations || !altitudes || !launchYears || count === 0) return;
 
     const totals = [0, 0, 0, 0, 0];
     const ops = [0, 0, 0, 0, 0];
+    // Per-shell, per-year: Map<shellIndex, Map<year, {op, total}>>
+    const yearMaps: Map<number, { op: number; total: number }>[] = Array.from({ length: 5 }, () => new Map());
 
     for (let i = 0; i < count; i++) {
       const inc = inclinations[i];
       const si = shellIndex(inc);
+      const yr = launchYears[i];
+      const isOp = isOperationalAltitude(inc, altitudes[i]);
+
       totals[si]++;
-      if (isOperationalAltitude(inc, altitudes[i])) {
-        ops[si]++;
+      if (isOp) ops[si]++;
+
+      if (yr > 0) {
+        const entry = yearMaps[si].get(yr) ?? { op: 0, total: 0 };
+        entry.total++;
+        if (isOp) entry.op++;
+        yearMaps[si].set(yr, entry);
       }
     }
 
     setShellStats(
-      SHELLS.map((s, i) => ({ label: s.label, color: s.color, total: totals[i], operational: ops[i] }))
+      SHELLS.map((s, i) => {
+        const years: YearBreakdown[] = Array.from(yearMaps[i].entries())
+          .map(([year, { op, total }]) => ({ year, operational: op, total }))
+          .sort((a, b) => a.year - b.year);
+        return { label: s.label, color: s.color, total: totals[i], operational: ops[i], years };
+      })
     );
   }, []);
 
@@ -148,19 +170,24 @@ export default function HandoffPanel() {
             <span className="text-white/30 text-right">Operational</span>
             <span className="text-white/30 text-right">Total</span>
             <span className="text-white/30 text-right">%</span>
-            {shellStats.map((s) => (
-              <div key={s.label} className="contents">
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: s.color }} />
-                  <span className="text-white/50">{s.label}</span>
-                </span>
-                <span className="text-white/60 text-right">{s.operational.toLocaleString()}</span>
-                <span className="text-white/40 text-right">{s.total.toLocaleString()}</span>
-                <span className="text-white/60 text-right">
-                  {s.total > 0 ? `${Math.round((s.operational / s.total) * 100)}%` : '—'}
-                </span>
-              </div>
-            ))}
+            {shellStats.map((s) => {
+              const yearTooltip = s.years.length > 0
+                ? s.years.map((y) => `${y.year}: ${y.operational} op / ${y.total} total`).join('\n')
+                : 'No satellites launched';
+              return (
+                <div key={s.label} className="contents cursor-default" title={yearTooltip}>
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: s.color }} />
+                    <span className="text-white/50">{s.label}</span>
+                  </span>
+                  <span className="text-white/60 text-right">{s.operational.toLocaleString()}</span>
+                  <span className="text-white/40 text-right">{s.total.toLocaleString()}</span>
+                  <span className="text-white/60 text-right">
+                    {s.total > 0 ? `${Math.round((s.operational / s.total) * 100)}%` : '—'}
+                  </span>
+                </div>
+              );
+            })}
             {/* Totals row */}
             <div className="contents">
               <span className="text-white/50 font-medium pt-0.5 border-t border-white/10">All</span>

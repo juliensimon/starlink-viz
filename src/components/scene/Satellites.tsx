@@ -120,13 +120,17 @@ export default function Satellites() {
     // the full catalog snapshot and the altitude filter).
     const allInclinations = new Float32Array(totalCount);
     const allAltitudes = new Float32Array(totalCount);
+    const allLaunchYears = new Uint16Array(totalCount);
     for (let i = 0; i < totalCount; i++) {
       const inc = parseFloat(tleData[i].line2.substring(8, 16));
       allInclinations[i] = isNaN(inc) ? 53 : inc;
       const data = propagateSingle(allSatrecs[i], now);
       allAltitudes[i] = data ? data.altitudeKm : 0;
+      // Parse launch year from international designator (line1 cols 9-10)
+      const yy = parseInt(tleData[i].line1.substring(9, 11), 10);
+      allLaunchYears[i] = isNaN(yy) ? 0 : (yy >= 57 ? 1900 + yy : 2000 + yy);
     }
-    setFullCatalog(totalCount, allInclinations, allAltitudes);
+    setFullCatalog(totalCount, allInclinations, allAltitudes, allLaunchYears);
 
     let filteredTle = tleData;
     let filteredSatrecs = allSatrecs;
