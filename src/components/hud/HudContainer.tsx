@@ -10,7 +10,7 @@ import ViewControls from './ViewControls';
 import ColorLegend from './ColorLegend';
 
 export default function HudContainer() {
-  const demoMode = useAppStore((s) => s.demoMode);
+
   const hudVisible = useAppStore((s) => s.hudVisible);
   const setHudVisible = useAppStore((s) => s.setHudVisible);
 
@@ -43,14 +43,6 @@ export default function HudContainer() {
 
       {/* Use CSS visibility to hide HUD without unmounting, preserving component state */}
       <div className={hudVisible ? '' : 'invisible'}>
-        {/* Demo badge */}
-        {demoMode && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto">
-            <div className="px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-[10px] uppercase tracking-[0.2em] font-semibold animate-pulse">
-              Demo Mode
-            </div>
-          </div>
-        )}
 
         {/* Top-left: Status + Telemetry + Satellite Link + Handoff stacked */}
         <div className="absolute top-4 left-4 md:top-6 md:left-6 pointer-events-auto space-y-2">

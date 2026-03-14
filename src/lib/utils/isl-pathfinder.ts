@@ -433,7 +433,7 @@ export function findBestRoute(
 
       // Expand to ISL neighbors
       if (qNode.hops >= ISL_MAX_HOPS) continue;
-      if (qNode.latencyMs > 20) continue; // Cap one-way ISL accumulation at 20ms (~3 hops)
+      if (qNode.latencyMs > 40) continue; // Cap one-way ISL accumulation at 40ms (~5 hops)
 
       const start = graph.neighborOffsets[qNode.satIndex];
       const end = graph.neighborOffsets[qNode.satIndex + 1];
@@ -479,7 +479,29 @@ export function findBestRoute(
   };
 
   if (candidateRoutes.length === 0) {
-    // No valid PoP-constrained route found — fall back
+    // No valid PoP-constrained route found this cycle.
+    // If ISL is mandatory and we had a previous ISL route, hold it —
+    // the graph is momentarily sparse but the route likely still works.
+    // The real system doesn't drop to unconstrained routing when the
+    // topology momentarily lacks a path.
+    if (islMandatory && previousRoute && previousRoute.type === 'isl') {
+      // Recompute latency with current positions
+      const exitSatPos = posAt(positions, previousRoute.satelliteIndices[previousRoute.satelliteIndices.length - 1]);
+      const exitGSPos = gsPositions[previousRoute.groundStationIndex];
+      if (exitSatPos && exitGSPos) {
+        const satPositions = previousRoute.satelliteIndices.map((si) => posAt(positions, si)!).filter(Boolean);
+        if (satPositions.length > 0) {
+          previousRoute = {
+            ...previousRoute,
+            latencyMs: computeISLRouteLatency(dishPos, satPositions, exitGSPos) + GS_BACKHAUL_RTT_MS[previousRoute.groundStationIndex],
+          };
+        }
+      }
+      logRouteDecision({ time: new Date().toISOString(), action: 'hold', reason: 'ISL mandatory, no new candidates — holding previous ISL route', route: routeSummary(previousRoute), context: logCtx });
+      return previousRoute;
+    }
+
+    // Genuine fallback — no previous ISL route to hold
     if (directRoutes.length > 0) {
       previousRoute = directRoutes[0];
       previousRouteTime = now;

@@ -1,5 +1,33 @@
 import { create } from 'zustand';
 
+export interface DemoLocation {
+  name: string;
+  lat: number;
+  lon: number;
+  pop: string;     // assigned PoP for this region
+  description: string;
+}
+
+/** Remote locations where ISL routing is mandatory — no nearby GS serves the local PoP.
+ *  Each uses a real Starlink PoP that's far from any visible ground station. */
+export const DEMO_LOCATIONS: DemoLocation[] = [
+  // Each location is 2,500–5,000km from the PoP's nearest GS — far enough
+  // that no GS is visible from the serving satellite (>2,500km horizon),
+  // close enough for ISL to bridge the gap in 3-6 hops.
+  // Each location uses a PoP whose nearest GS is 2,700–4,500km away —
+  // far enough that no GS is visible, close enough for 1-4 ISL hops.
+  { name: 'Iceland Gap',          lat: 60.0,   lon: -30.0,  pop: 'Washington DC, US', description: '2,800km to Nova Scotia — ISL bridges the gap' },
+  { name: 'N Atlantic (55°N)',    lat: 55.0,   lon: -20.0,  pop: 'Chicago, US',       description: '3,500km to Canadian GSes' },
+  { name: 'N Atlantic (45°N)',    lat: 45.0,   lon: -20.0,  pop: 'Washington DC, US', description: '3,400km to US East Coast GSes' },
+  { name: 'E Atlantic (Azores)',  lat: 35.0,   lon: -20.0,  pop: 'Washington DC, US', description: '3,800km to US East Coast' },
+  { name: 'Celtic Sea',           lat: 50.0,   lon: -15.0,  pop: 'Washington DC, US', description: '3,700km to Nova Scotia' },
+  { name: 'Gulf of Mexico',       lat: 25.0,   lon: -85.0,  pop: 'Seattle, US',       description: '2,900km to Pacific NW GSes' },
+  { name: 'W Atlantic (30°N)',    lat: 30.0,   lon: -55.0,  pop: 'London, GB',        description: '4,300km to UK/Portugal GSes' },
+  { name: 'Caribbean',            lat: 18.0,   lon: -65.0,  pop: 'Los Angeles, US',   description: '4,100km to SW US GSes' },
+  { name: 'Norwegian Sea',        lat: 66.0,   lon: 0.0,    pop: 'Washington DC, US', description: '4,400km to US East Coast' },
+  { name: 'Bay of Biscay',        lat: 45.0,   lon: -8.0,   pop: 'Washington DC, US', description: '4,300km to US East Coast' },
+];
+
 interface AppState {
   selectedSatelliteIndex: number | null;
   connectedSatelliteIndex: number | null;
@@ -13,6 +41,7 @@ interface AppState {
   altitudeFilter: boolean; // filter to operational altitude band (530-580 km)
   hudVisible: boolean;
   islPrediction: boolean;
+  demoLocation: DemoLocation | null;
 
   setSelectedSatellite: (index: number | null) => void;
   setConnectedSatellite: (index: number | null) => void;
@@ -26,6 +55,7 @@ interface AppState {
   setAltitudeFilter: (enabled: boolean) => void;
   setHudVisible: (visible: boolean) => void;
   setISLPrediction: (enabled: boolean) => void;
+  setDemoLocation: (location: DemoLocation | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -41,6 +71,7 @@ export const useAppStore = create<AppState>((set) => ({
   altitudeFilter: true,
   hudVisible: true,
   islPrediction: true,
+  demoLocation: null,
 
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
@@ -54,4 +85,5 @@ export const useAppStore = create<AppState>((set) => ({
   setAltitudeFilter: (enabled) => set({ altitudeFilter: enabled }),
   setHudVisible: (visible) => set({ hudVisible: visible }),
   setISLPrediction: (enabled) => set({ islPrediction: enabled }),
+  setDemoLocation: (location) => set({ demoLocation: location }),
 }));

@@ -30,6 +30,7 @@ export default function SatelliteInfoPanel() {
   const hasConnection = connectedSatelliteIndex !== null;
 
   const islPrediction = useAppStore((s) => s.islPrediction);
+  const demoLocation = useAppStore((s) => s.demoLocation);
 
   // Poll orbital data, gateway, and route from satellite store
   const [altitude, setAltitude] = useState<number | null>(null);
@@ -200,10 +201,10 @@ export default function SatelliteInfoPanel() {
           <span className="text-[10px] tabular-nums" style={{ color: '#ff9933' }}>{gateway}</span>
         </div>
       )}
-      {pop && (
+      {(pop || demoLocation) && (
         <div className="flex justify-between items-baseline" title="Point of Presence — internet exchange where your traffic exits Starlink">
           <span className="text-[11px] text-white/50">PoP</span>
-          <span className="text-[10px] tabular-nums" style={{ color: '#ff9933' }}>{pop}</span>
+          <span className="text-[10px] tabular-nums" style={{ color: '#ff9933' }}>{demoLocation?.pop ?? pop}</span>
         </div>
       )}
     </div>
