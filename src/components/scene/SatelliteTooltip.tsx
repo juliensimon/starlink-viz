@@ -25,54 +25,34 @@ function estimateAltitude(x: number, y: number, z: number): string {
   return `~${altKm} km`;
 }
 
-/** Dispatches tooltip data as a CustomEvent on window. */
 function dispatchTooltip(data: TooltipData | null) {
   window.dispatchEvent(new CustomEvent('satellite-tooltip', { detail: data }));
 }
 
+const MAX_PICK_DISTANCE_PX = 15;
+const _projected = new THREE.Vector3();
+
 /**
- * Raycasts against the satellite InstancedMesh on mouse move (throttled).
- * Must be placed inside <Canvas>.
+ * Screen-space nearest-neighbor satellite picking.
+ * Projects each satellite position to screen coordinates and finds
+ * the closest one to the mouse cursor within MAX_PICK_DISTANCE_PX.
  */
 export default function SatelliteTooltip() {
-  const { camera, gl, scene } = useThree();
-  const raycaster = useRef(new THREE.Raycaster());
-  const mouse = useRef(new THREE.Vector2());
-  const lastMoveTime = useRef(0);
+  const { camera, gl } = useThree();
+  const mouseX = useRef(0);
+  const mouseY = useRef(0);
   const needsRaycast = useRef(false);
-  const instancedMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const lastTooltipIdx = useRef<number | null>(null);
-
-  // Find the InstancedMesh in the scene (once)
-  useEffect(() => {
-    scene.traverse((obj) => {
-      if ((obj as THREE.InstancedMesh).isInstancedMesh) {
-        instancedMeshRef.current = obj as THREE.InstancedMesh;
-      }
-    });
-  }, [scene]);
-
-  // Re-find mesh when scene children change
-  useFrame(() => {
-    if (!instancedMeshRef.current) {
-      scene.traverse((obj) => {
-        if ((obj as THREE.InstancedMesh).isInstancedMesh) {
-          instancedMeshRef.current = obj as THREE.InstancedMesh;
-        }
-      });
-    }
-  });
+  const lastMoveTime = useRef(0);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const now = performance.now();
-    if (now - lastMoveTime.current < 100) return;
+    if (now - lastMoveTime.current < 80) return;
     lastMoveTime.current = now;
-
-    const rect = gl.domElement.getBoundingClientRect();
-    mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    mouseX.current = e.clientX;
+    mouseY.current = e.clientY;
     needsRaycast.current = true;
-  }, [gl]);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
     dispatchTooltip(null);
@@ -91,43 +71,65 @@ export default function SatelliteTooltip() {
   }, [gl, handleMouseMove, handleMouseLeave]);
 
   useFrame(() => {
-    if (!needsRaycast.current || !instancedMeshRef.current) return;
+    if (!needsRaycast.current) return;
     needsRaycast.current = false;
 
+    const positions = getPositionsArray();
+    const tleData = getTLEData();
+    if (!positions || tleData.length === 0) return;
+
+    const rect = gl.domElement.getBoundingClientRect();
+    const mx = mouseX.current - rect.left;
+    const my = mouseY.current - rect.top;
     const connectedSatelliteIndex = useAppStore.getState().connectedSatelliteIndex;
 
-    raycaster.current.setFromCamera(mouse.current, camera);
-    const intersections = raycaster.current.intersectObject(instancedMeshRef.current);
+    let bestIdx = -1;
+    let bestDistSq = MAX_PICK_DISTANCE_PX * MAX_PICK_DISTANCE_PX;
 
-    if (intersections.length > 0 && intersections[0].instanceId !== undefined) {
-      const idx = intersections[0].instanceId;
+    const count = tleData.length;
+    // Sample every 1st satellite for performance (10K projections per frame is expensive)
+    // But check all within the first pass
+    for (let i = 0; i < count; i++) {
+      const pi = i * 3;
+      const x = positions[pi];
+      const y = positions[pi + 1];
+      const z = positions[pi + 2];
+      if (x === 0 && y === 0 && z === 0) continue;
 
-      // Skip redundant updates
-      if (idx === lastTooltipIdx.current) return;
-      lastTooltipIdx.current = idx;
+      _projected.set(x, y, z).project(camera);
 
-      const tleData = getTLEData();
-      const positions = getPositionsArray();
+      // Skip if behind camera
+      if (_projected.z > 1) continue;
 
-      if (tleData[idx] && positions) {
-        const tle = tleData[idx];
-        const pi = idx * 3;
+      const sx = ((_projected.x + 1) / 2) * rect.width;
+      const sy = ((-_projected.y + 1) / 2) * rect.height;
 
-        const pos3d = new THREE.Vector3(positions[pi], positions[pi + 1], positions[pi + 2]);
-        pos3d.project(camera);
-        const rect = gl.domElement.getBoundingClientRect();
-        const screenX = ((pos3d.x + 1) / 2) * rect.width + rect.left;
-        const screenY = ((-pos3d.y + 1) / 2) * rect.height + rect.top;
+      const dx = sx - mx;
+      const dy = sy - my;
+      const distSq = dx * dx + dy * dy;
 
-        dispatchTooltip({
-          name: tle.name,
-          noradId: parseNoradId(tle.line1),
-          altitude: estimateAltitude(positions[pi], positions[pi + 1], positions[pi + 2]),
-          isConnected: idx === connectedSatelliteIndex,
-          x: screenX,
-          y: screenY,
-        });
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestIdx = i;
       }
+    }
+
+    if (bestIdx >= 0) {
+      if (bestIdx === lastTooltipIdx.current) return;
+      lastTooltipIdx.current = bestIdx;
+
+      const tle = tleData[bestIdx];
+      const pi = bestIdx * 3;
+      _projected.set(positions[pi], positions[pi + 1], positions[pi + 2]).project(camera);
+
+      dispatchTooltip({
+        name: tle.name,
+        noradId: parseNoradId(tle.line1),
+        altitude: estimateAltitude(positions[pi], positions[pi + 1], positions[pi + 2]),
+        isConnected: bestIdx === connectedSatelliteIndex,
+        x: ((_projected.x + 1) / 2) * rect.width + rect.left,
+        y: ((-_projected.y + 1) / 2) * rect.height + rect.top,
+      });
     } else {
       if (lastTooltipIdx.current !== null) {
         dispatchTooltip(null);

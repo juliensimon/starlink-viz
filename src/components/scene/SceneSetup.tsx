@@ -4,14 +4,32 @@ import { useRef, useCallback, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { useAppStore } from '@/stores/app-store';
+import { getDishPosition } from './DishMarker';
+
+const FOCUS_DISTANCE = 1.5; // Max zoom (matches OrbitControls minDistance)
 
 export default function SceneSetup() {
   const { camera, gl } = useThree();
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
   const targetLookAt = useRef<THREE.Vector3 | null>(null);
+  const targetCamPos = useRef<THREE.Vector3 | null>(null);
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
   const animProgress = useRef(1); // 1 = done
+
+  const autoRotate = useAppStore((s) => s.autoRotate);
+  const focusDishRequested = useAppStore((s) => s.focusDishRequested);
+
+  // Focus on dish when requested
+  useEffect(() => {
+    if (focusDishRequested === 0) return;
+    const dishPos = getDishPosition();
+    const dir = dishPos.clone().normalize();
+    targetCamPos.current = dir.clone().multiplyScalar(FOCUS_DISTANCE);
+    targetLookAt.current = new THREE.Vector3(0, 0, 0);
+    animProgress.current = 0;
+  }, [focusDishRequested]);
 
   const handleDoubleClick = useCallback(
     (e: MouseEvent) => {
@@ -26,7 +44,9 @@ export default function SceneSetup() {
       const ray = raycaster.current.ray;
 
       if (ray.intersectSphere(globeSphere, hitPoint)) {
-        targetLookAt.current = hitPoint.clone();
+        const dir = hitPoint.clone().normalize();
+        targetCamPos.current = dir.multiplyScalar(camera.position.length());
+        targetLookAt.current = new THREE.Vector3(0, 0, 0);
         animProgress.current = 0;
       }
     },
@@ -42,16 +62,17 @@ export default function SceneSetup() {
   }, [gl, handleDoubleClick]);
 
   useFrame((_state, delta) => {
-    if (targetLookAt.current && animProgress.current < 1) {
+    if (targetCamPos.current && animProgress.current < 1) {
       animProgress.current = Math.min(1, animProgress.current + delta * 2);
-      currentLookAt.current.lerp(targetLookAt.current, animProgress.current);
+      const t = animProgress.current;
+      // Smooth ease-out
+      const ease = 1 - Math.pow(1 - t, 3);
 
-      const dir = currentLookAt.current.clone().normalize();
-      const dist = camera.position.length();
-      camera.position.copy(dir.multiplyScalar(dist));
+      camera.position.lerp(targetCamPos.current, ease);
       camera.lookAt(0, 0, 0);
 
       if (animProgress.current >= 1) {
+        targetCamPos.current = null;
         targetLookAt.current = null;
       }
     }
@@ -59,16 +80,13 @@ export default function SceneSetup() {
 
   return (
     <>
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[5, 3, 5]} intensity={1.8} />
-
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
         minDistance={1.5}
         maxDistance={5}
         enablePan={false}
-        autoRotate
+        autoRotate={autoRotate}
         autoRotateSpeed={0.3}
       />
 

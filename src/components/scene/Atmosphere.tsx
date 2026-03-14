@@ -44,7 +44,7 @@ export default function Atmosphere() {
   );
 
   return (
-    <mesh ref={meshRef} scale={[1.02, 1.02, 1.02]}>
+    <mesh ref={meshRef} scale={[1.016, 1.016, 1.016]}>
       <sphereGeometry args={[1, 64, 64]} />
       <shaderMaterial
         vertexShader={atmosphereVertexShader}

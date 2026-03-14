@@ -5,6 +5,8 @@ import { useTelemetryStore } from '@/stores/telemetry-store';
 import { useAppStore } from '@/stores/app-store';
 import type { WSMessage, DishStatus, DishHistory, HandoffEvent, EventLogEntry } from '../grpc/types';
 
+const setWsConnected = (connected: boolean) => useAppStore.getState().setWsConnected(connected);
+
 interface UseWebSocketReturn {
   connected: boolean;
   lastMessage: WSMessage | null;
@@ -20,8 +22,6 @@ export function useWebSocket(): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef(1000);
-  const previousStatusRef = useRef<DishStatus | null>(null);
-
   const updateStatus = useTelemetryStore((s) => s.updateStatus);
   const pushHistory = useTelemetryStore((s) => s.pushHistory);
   const addEvent = useTelemetryStore((s) => s.addEvent);
@@ -37,7 +37,13 @@ export function useWebSocket(): UseWebSocketReturn {
             const status = msg.data as DishStatus;
             setDishStatus(status);
 
-            // Update telemetry store
+            // Detect demo mode from device ID immediately (not deferred)
+            const isDemoDevice = status.deviceId.includes('demo');
+            useAppStore.getState().setDemoMode(isDemoDevice);
+
+            // Az/el are always computed client-side by ConnectionBeam
+            // (dish only reports physical antenna tilt, not active beam direction)
+            const currentStatus = useTelemetryStore.getState().dishStatus;
             updateStatus({
               ping: status.popPingLatency,
               downlink: status.downlinkThroughput,
@@ -46,9 +52,12 @@ export function useWebSocket(): UseWebSocketReturn {
               uptime: status.uptime,
               state: status.state,
               obstructions: status.obstructionPercentTime,
-              azimuth: status.boresightAzimuth,
-              elevation: status.boresightElevation,
+              azimuth: currentStatus?.azimuth ?? 0,
+              elevation: currentStatus?.elevation ?? 0,
               dropRate: status.popPingDropRate,
+              gpsSats: status.gpsSats,
+              antennaBoresightAz: status.boresightAzimuth,
+              antennaBoresightEl: status.boresightElevation,
               deviceId: status.deviceId,
               softwareVersion: status.softwareVersion,
             });
@@ -60,21 +69,6 @@ export function useWebSocket(): UseWebSocketReturn {
               uplink: status.uplinkThroughput,
               snr: status.snr,
             });
-
-            // Detect handoff from boresight changes
-            const prev = previousStatusRef.current;
-            if (prev) {
-              const azDelta = Math.abs(status.boresightAzimuth - prev.boresightAzimuth);
-              const elDelta = Math.abs(status.boresightElevation - prev.boresightElevation);
-              if (azDelta > 10 || elDelta > 10) {
-                addEvent({
-                  timestamp: Date.now(),
-                  message: `Satellite handoff detected (az: ${prev.boresightAzimuth.toFixed(1)} -> ${status.boresightAzimuth.toFixed(1)}, el: ${prev.boresightElevation.toFixed(1)} -> ${status.boresightElevation.toFixed(1)})`,
-                  type: 'success',
-                });
-              }
-            }
-            previousStatusRef.current = status;
             break;
           }
 
@@ -88,7 +82,7 @@ export function useWebSocket(): UseWebSocketReturn {
             const handoff = msg.data as HandoffEvent;
             addEvent({
               timestamp: Date.now(),
-              message: `Handoff: az ${handoff.previousAzimuth.toFixed(1)} -> ${handoff.newAzimuth.toFixed(1)}, el ${handoff.previousElevation.toFixed(1)} -> ${handoff.newElevation.toFixed(1)}`,
+              message: `Handoff: az ${handoff.previousAzimuth.toFixed(1)}\u00B0 \u2192 ${handoff.newAzimuth.toFixed(1)}\u00B0, el ${handoff.previousElevation.toFixed(1)}\u00B0 \u2192 ${handoff.newElevation.toFixed(1)}\u00B0`,
               type: 'success',
             });
             break;
@@ -99,7 +93,6 @@ export function useWebSocket(): UseWebSocketReturn {
             addEvent({
               timestamp: entry.timestamp,
               message: entry.message,
-              // Map 'handoff' type to 'success' for the telemetry store
               type: entry.type === 'handoff' ? 'success' : entry.type,
             });
             break;
@@ -124,15 +117,16 @@ export function useWebSocket(): UseWebSocketReturn {
     ws.onopen = () => {
       console.log('[WS] Connected');
       setConnected(true);
-      reconnectDelayRef.current = 1000; // Reset backoff
+      setWsConnected(true);
+      reconnectDelayRef.current = 1000;
     };
 
     ws.onclose = () => {
       console.log('[WS] Disconnected');
       setConnected(false);
+      setWsConnected(false);
       wsRef.current = null;
 
-      // Reconnect with exponential backoff
       const delay = reconnectDelayRef.current;
       reconnectDelayRef.current = Math.min(delay * 2, 10000);
       reconnectTimeoutRef.current = setTimeout(connect, delay);
@@ -158,14 +152,6 @@ export function useWebSocket(): UseWebSocketReturn {
       }
     };
   }, [connect]);
-
-  // Update app store demo mode based on device ID
-  useEffect(() => {
-    if (dishStatus) {
-      const isDemoMode = dishStatus.deviceId.includes('demo');
-      useAppStore.getState().setDemoMode(isDemoMode);
-    }
-  }, [dishStatus]);
 
   return { connected, lastMessage, dishStatus, dishHistory };
 }

@@ -4,12 +4,20 @@
  */
 
 import type { TLEData } from './tle-fetcher';
-import type { SatRec } from './propagator';
+import type { SatRec, SatelliteOrbitalData } from './propagator';
 
 let tleData: TLEData[] = [];
 let satrecObjects: SatRec[] = [];
 let connectedIndex: number | null = null;
 let positionsArray: Float32Array | null = null;
+let connectedOrbitalData: SatelliteOrbitalData | null = null;
+let connectedGroundStation: string | null = null;
+let inclinationsArray: Float32Array | null = null;
+
+// Full (unfiltered) catalog — used for shell stats regardless of altitude filter toggle
+let fullCatalogCount = 0;
+let fullCatalogInclinations: Float32Array | null = null;
+let fullCatalogAltitudes: Float32Array | null = null;
 
 /** Set the TLE data catalog */
 export function setTLEData(data: TLEData[]): void {
@@ -59,4 +67,53 @@ export function setPositionsArray(positions: Float32Array): void {
 /** Get the shared satellite positions Float32Array */
 export function getPositionsArray(): Float32Array | null {
   return positionsArray;
+}
+
+/** Set orbital data for the connected satellite */
+export function setConnectedOrbitalData(data: SatelliteOrbitalData | null): void {
+  connectedOrbitalData = data;
+}
+
+/** Get orbital data for the connected satellite */
+export function getConnectedOrbitalData(): SatelliteOrbitalData | null {
+  return connectedOrbitalData;
+}
+
+/** Set connected ground station name */
+export function setConnectedGroundStation(name: string | null): void {
+  connectedGroundStation = name;
+}
+
+/** Get connected ground station name */
+export function getConnectedGroundStation(): string | null {
+  return connectedGroundStation;
+}
+
+/** Set the inclinations array */
+export function setInclinationsArray(inclinations: Float32Array): void {
+  inclinationsArray = inclinations;
+}
+
+/** Get the inclinations array */
+export function getInclinationsArray(): Float32Array | null {
+  return inclinationsArray;
+}
+
+/** Store the full unfiltered catalog snapshot for shell statistics */
+export function setFullCatalog(count: number, inclinations: Float32Array, altitudes: Float32Array): void {
+  fullCatalogCount = count;
+  fullCatalogInclinations = inclinations;
+  fullCatalogAltitudes = altitudes;
+}
+
+/** Get full catalog data for shell statistics */
+export function getFullCatalog(): { count: number; inclinations: Float32Array | null; altitudes: Float32Array | null } {
+  return { count: fullCatalogCount, inclinations: fullCatalogInclinations, altitudes: fullCatalogAltitudes };
+}
+
+/** Get NORAD catalog ID from TLE line 1 */
+export function getNoradId(index: number): string {
+  const tle = tleData[index];
+  if (!tle) return '---';
+  return tle.line1.substring(2, 7).trim();
 }

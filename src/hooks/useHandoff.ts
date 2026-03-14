@@ -1,45 +1,45 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useAppStore } from '@/stores/app-store';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 
-const HANDOFF_THRESHOLD_DEG = 10;
 const HANDOFF_DURATION_MS = 2000;
+const MIN_ELEVATION_DEG = 25;
 
 export function useHandoff() {
   const [isHandingOff, setIsHandingOff] = useState(false);
   const [handoffProgress, setHandoffProgress] = useState(0);
   const [timeToNextHandoff, setTimeToNextHandoff] = useState<number | null>(null);
 
-  const dishStatus = useTelemetryStore((s) => s.dishStatus);
-  const previousRef = useRef<{ azimuth: number; elevation: number } | null>(null);
+  const connectedSatelliteIndex = useAppStore((s) => s.connectedSatelliteIndex);
+  const elevation = useTelemetryStore((s) => s.dishStatus?.elevation ?? 0);
+
+  const previousIdxRef = useRef<number | null>(null);
   const handoffStartRef = useRef<number>(0);
-  const lastHandoffTimeRef = useRef<number>(Date.now());
 
+  // Track elevation rate of change
+  const prevElevationRef = useRef<number>(0);
+  const prevElevationTimeRef = useRef<number>(Date.now());
+
+  // Rolling average of elevation rate (5 samples)
+  const rateSamplesRef = useRef<number[]>([]);
+  const [descentRate, setDescentRate] = useState<number | null>(null);
+
+  // Detect handoff from actual satellite index change
   useEffect(() => {
-    if (!dishStatus) return;
+    if (connectedSatelliteIndex === null) return;
 
-    const current = {
-      azimuth: dishStatus.azimuth,
-      elevation: dishStatus.elevation,
-    };
-
-    if (previousRef.current) {
-      const azDelta = Math.abs(current.azimuth - previousRef.current.azimuth);
-      const elDelta = Math.abs(current.elevation - previousRef.current.elevation);
-
-      if (
-        (azDelta > HANDOFF_THRESHOLD_DEG || elDelta > HANDOFF_THRESHOLD_DEG) &&
-        !isHandingOff
-      ) {
-        setIsHandingOff(true);
-        handoffStartRef.current = Date.now();
-        lastHandoffTimeRef.current = Date.now();
-      }
+    if (
+      previousIdxRef.current !== null &&
+      previousIdxRef.current !== connectedSatelliteIndex
+    ) {
+      setIsHandingOff(true);
+      handoffStartRef.current = Date.now();
     }
 
-    previousRef.current = current;
-  }, [dishStatus, isHandingOff]);
+    previousIdxRef.current = connectedSatelliteIndex;
+  }, [connectedSatelliteIndex]);
 
   // Animate handoff progress and reset
   useEffect(() => {
@@ -60,21 +60,54 @@ export function useHandoff() {
     return () => clearInterval(interval);
   }, [isHandingOff]);
 
-  // Estimate time to next handoff (rough average of 20s between handoffs)
+  // Estimate time to next handoff from measured elevation descent rate
   useEffect(() => {
-    const interval = setInterval(() => {
-      const sinceLastHandoff = Date.now() - lastHandoffTimeRef.current;
-      const avgInterval = 20000; // 20 seconds average
-      const remaining = Math.max(0, avgInterval - sinceLastHandoff);
-      setTimeToNextHandoff(Math.round(remaining / 1000));
-    }, 1000);
+    if (elevation <= MIN_ELEVATION_DEG) {
+      setTimeToNextHandoff(0);
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    const now = Date.now();
+    const dt = (now - prevElevationTimeRef.current) / 1000; // seconds
+    const dEl = elevation - prevElevationRef.current; // degrees
+
+    prevElevationRef.current = elevation;
+    prevElevationTimeRef.current = now;
+
+    // Need at least 1s of data, discard stale gaps
+    if (dt < 1 || dt > 30) return;
+
+    const instantRate = dEl / dt; // deg/s, negative = descending
+
+    // Push into rolling window and keep last 5
+    const samples = rateSamplesRef.current;
+    samples.push(instantRate);
+    if (samples.length > 5) samples.shift();
+
+    const avgRate = samples.reduce((a, b) => a + b, 0) / samples.length;
+    const degreesAboveMin = elevation - MIN_ELEVATION_DEG;
+
+    if (avgRate < -0.001) {
+      // Satellite is descending — use smoothed rate
+      const absRate = Math.abs(avgRate);
+      const estimated = Math.round(degreesAboveMin / absRate);
+      setTimeToNextHandoff(Math.min(estimated, 600)); // cap at 10 min
+      setDescentRate(absRate);
+    } else if (avgRate > 0.001) {
+      // Satellite is ascending — no handoff imminent
+      setTimeToNextHandoff(null);
+      setDescentRate(null);
+    } else {
+      // Near peak — satellite barely moving in elevation
+      setTimeToNextHandoff(null);
+      setDescentRate(null);
+    }
+  }, [elevation]);
 
   return {
     isHandingOff,
     handoffProgress,
     timeToNextHandoff,
+    descentRate,
   };
 }

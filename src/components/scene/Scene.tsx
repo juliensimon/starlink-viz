@@ -10,27 +10,9 @@ import DishMarker from './DishMarker';
 import GroundStations from './GroundStations';
 import ConnectionBeam from './ConnectionBeam';
 import SatelliteTooltip from './SatelliteTooltip';
-
-// Firefox bug: WebGL2RenderingContext.getContextAttributes() returns null,
-// crashing both R3F Canvas init and postprocessing EffectComposer.
-// Patch at module level so it runs before any Canvas renders.
-if (typeof window !== 'undefined' && typeof WebGL2RenderingContext !== 'undefined') {
-  const origGetCA = WebGL2RenderingContext.prototype.getContextAttributes;
-  WebGL2RenderingContext.prototype.getContextAttributes = function () {
-    return origGetCA.call(this) ?? {
-      alpha: true,
-      antialias: true,
-      depth: true,
-      failIfMajorPerformanceCaveat: false,
-      powerPreference: 'default' as WebGLPowerPreference,
-      premultipliedAlpha: true,
-      preserveDrawingBuffer: false,
-      stencil: true,
-      desynchronized: false,
-      xrCompatible: false,
-    };
-  };
-}
+import GpsSatellites from './GpsSatellites';
+import Sun from './Sun';
+import Moon from './Moon';
 
 export default function Scene() {
   return (
@@ -42,7 +24,10 @@ export default function Scene() {
     >
       <Globe />
       <Atmosphere />
+      <Sun />
+      <Moon />
       <Satellites />
+      <GpsSatellites />
       <DishMarker />
       <GroundStations />
       <ConnectionBeam />
