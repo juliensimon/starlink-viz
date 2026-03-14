@@ -17,11 +17,11 @@ export function geodeticToCartesian(
   alt: number,
   globeRadius: number = 1
 ): { x: number; y: number; z: number } {
-  // Compressed scale so satellites aren't too far from globe
-  const radius = globeRadius + (alt / 6371) * 0.15;
+  const radius = globeRadius + alt / 6371;
   const x = radius * Math.cos(lat) * Math.cos(lon);
   const y = radius * Math.sin(lat);
-  const z = radius * Math.cos(lat) * Math.sin(lon);
+  // Negate z to match Three.js SphereGeometry UV mapping (east-positive texture convention)
+  const z = -radius * Math.cos(lat) * Math.sin(lon);
   return { x, y, z };
 }
 

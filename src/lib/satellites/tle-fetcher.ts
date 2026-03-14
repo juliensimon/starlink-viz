@@ -6,6 +6,7 @@ export interface TLEData {
   name: string;
   line1: string;
   line2: string;
+  inclination: number; // degrees, parsed from TLE line 2 columns 8-16
 }
 
 const CELESTRAK_URL =
@@ -43,7 +44,8 @@ export function parseTLEText(text: string): TLEData[] {
 
     // Basic validation: line1 starts with '1 ', line2 starts with '2 '
     if (line1.startsWith('1 ') && line2.startsWith('2 ')) {
-      results.push({ name, line1, line2 });
+      const inclination = parseFloat(line2.substring(8, 16).trim());
+      results.push({ name, line1, line2, inclination });
     }
   }
 
