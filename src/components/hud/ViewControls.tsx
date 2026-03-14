@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppStore } from '@/stores/app-store';
+import { useAppStore, DEMO_LOCATIONS } from '@/stores/app-store';
 
 export default function ViewControls() {
   const autoRotate = useAppStore((s) => s.autoRotate);
@@ -12,6 +12,8 @@ export default function ViewControls() {
   const setISLPrediction = useAppStore((s) => s.setISLPrediction);
   const focusDish = useAppStore((s) => s.focusDish);
   const demoMode = useAppStore((s) => s.demoMode);
+  const demoLocation = useAppStore((s) => s.demoLocation);
+  const setDemoLocation = useAppStore((s) => s.setDemoLocation);
   const [switching, setSwitching] = useState(false);
 
   const toggleMode = async () => {
@@ -134,6 +136,32 @@ export default function ViewControls() {
           <div className="text-[9px] text-white/45 leading-tight">Laser link route estimation</div>
         </div>
       </button>
+
+      {/* Demo location selector — ISL showcase */}
+      {demoMode && islPrediction && (
+        <div className="mb-2">
+          <select
+            value={demoLocation?.name ?? ''}
+            onChange={(e) => {
+              const loc = DEMO_LOCATIONS.find((l) => l.name === e.target.value) ?? null;
+              setDemoLocation(loc);
+            }}
+            className="w-full bg-black/60 border border-green-500/30 rounded text-[11px] text-white/80 px-2 py-1.5 outline-none focus:border-green-500/60 appearance-none cursor-pointer"
+          >
+            <option value="">Dish location (default)</option>
+            {DEMO_LOCATIONS.map((loc) => (
+              <option key={loc.name} value={loc.name}>
+                {loc.name}
+              </option>
+            ))}
+          </select>
+          {demoLocation && (
+            <div className="text-[9px] text-green-400/60 mt-1 leading-tight">
+              {demoLocation.description}
+            </div>
+          )}
+        </div>
+      )}
 
       <hr className="hud-divider my-2" />
 
