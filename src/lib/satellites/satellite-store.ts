@@ -18,6 +18,7 @@ let inclinationsArray: Float32Array | null = null;
 let fullCatalogCount = 0;
 let fullCatalogInclinations: Float32Array | null = null;
 let fullCatalogAltitudes: Float32Array | null = null;
+let fullCatalogLaunchYears: Uint16Array | null = null;
 
 /** Set the TLE data catalog */
 export function setTLEData(data: TLEData[]): void {
@@ -100,15 +101,16 @@ export function getInclinationsArray(): Float32Array | null {
 }
 
 /** Store the full unfiltered catalog snapshot for shell statistics */
-export function setFullCatalog(count: number, inclinations: Float32Array, altitudes: Float32Array): void {
+export function setFullCatalog(count: number, inclinations: Float32Array, altitudes: Float32Array, launchYears: Uint16Array): void {
   fullCatalogCount = count;
   fullCatalogInclinations = inclinations;
   fullCatalogAltitudes = altitudes;
+  fullCatalogLaunchYears = launchYears;
 }
 
 /** Get full catalog data for shell statistics */
-export function getFullCatalog(): { count: number; inclinations: Float32Array | null; altitudes: Float32Array | null } {
-  return { count: fullCatalogCount, inclinations: fullCatalogInclinations, altitudes: fullCatalogAltitudes };
+export function getFullCatalog(): { count: number; inclinations: Float32Array | null; altitudes: Float32Array | null; launchYears: Uint16Array | null } {
+  return { count: fullCatalogCount, inclinations: fullCatalogInclinations, altitudes: fullCatalogAltitudes, launchYears: fullCatalogLaunchYears };
 }
 
 /** Get NORAD catalog ID from TLE line 1 */
