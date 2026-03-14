@@ -12,6 +12,7 @@ export interface DishStatus {
   obstructionPercentTime: number; // 0-100
   boresightAzimuth: number; // degrees
   boresightElevation: number; // degrees
+  gpsSats: number;
   alerts: string[];
 }
 

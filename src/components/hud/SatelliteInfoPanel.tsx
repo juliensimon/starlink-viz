@@ -1,84 +1,113 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 import { useAppStore } from '@/stores/app-store';
 import { formatDegrees } from '@/lib/utils/formatting';
+import { getSatelliteName, getNoradId, getConnectedOrbitalData, getConnectedGroundStation } from '@/lib/satellites/satellite-store';
 
-function CompassIndicator({ azimuth }: { azimuth: number }) {
-  return (
-    <div className="relative w-10 h-10 flex-shrink-0">
-      <svg viewBox="0 0 40 40" className="w-full h-full">
-        {/* Outer ring */}
-        <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(0,255,255,0.2)" strokeWidth="1" />
-        {/* Cardinal ticks */}
-        {[0, 90, 180, 270].map((deg) => {
-          const rad = (deg - 90) * (Math.PI / 180);
-          const x1 = 20 + Math.cos(rad) * 15;
-          const y1 = 20 + Math.sin(rad) * 15;
-          const x2 = 20 + Math.cos(rad) * 18;
-          const y2 = 20 + Math.sin(rad) * 18;
-          return (
-            <line
-              key={deg}
-              x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke="rgba(0,255,255,0.4)"
-              strokeWidth="1"
-            />
-          );
-        })}
-        {/* Direction pointer */}
-        <line
-          x1={20}
-          y1={20}
-          x2={20 + Math.cos((azimuth - 90) * (Math.PI / 180)) * 14}
-          y2={20 + Math.sin((azimuth - 90) * (Math.PI / 180)) * 14}
-          stroke="#00ffff"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <circle cx="20" cy="20" r="2" fill="#00ffff" />
-      </svg>
-    </div>
-  );
+function latencyConfidence(
+  measuredPing: number | undefined,
+  geometricLatency: number | null,
+  demoMode: boolean,
+): { color: string; label: string; delta: number } | null {
+  if (demoMode || !measuredPing || !geometricLatency) return null;
+  const delta = Math.abs(measuredPing - geometricLatency);
+  if (delta < 10) return { color: 'bg-green-400', label: 'High', delta };
+  if (delta < 25) return { color: 'bg-yellow-400', label: 'Medium', delta };
+  return { color: 'bg-red-400', label: 'Low', delta };
 }
 
 export default function SatelliteInfoPanel() {
   const status = useTelemetryStore((s) => s.dishStatus);
+  const geometricLatency = useTelemetryStore((s) => s.geometricLatency);
   const connectedSatelliteIndex = useAppStore((s) => s.connectedSatelliteIndex);
+  const demoMode = useAppStore((s) => s.demoMode);
 
   const azimuth = status?.azimuth ?? 0;
   const elevation = status?.elevation ?? 0;
   const hasConnection = connectedSatelliteIndex !== null;
 
+  // Poll orbital data and gateway from satellite store
+  const [altitude, setAltitude] = useState<number | null>(null);
+  const [velocity, setVelocity] = useState<number | null>(null);
+  const [gateway, setGateway] = useState<string | null>(null);
+  const [pop, setPop] = useState<string | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const data = getConnectedOrbitalData();
+      if (data) {
+        setAltitude(data.altitudeKm);
+        setVelocity(data.velocityKmS);
+      } else {
+        setAltitude(null);
+        setVelocity(null);
+      }
+      setGateway(getConnectedGroundStation());
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch PoP on mount, retry if unknown
+  useEffect(() => {
+    let retries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const fetchPop = () => {
+      fetch('/api/pop')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.pop) setPop(d.pop);
+          if (d.pop === 'Unknown' && retries < 3) {
+            retries++;
+            timer = setTimeout(fetchPop, 10000);
+          }
+        })
+        .catch(() => {
+          if (retries < 3) {
+            retries++;
+            timer = setTimeout(fetchPop, 10000);
+          }
+        });
+    };
+    fetchPop();
+    return () => clearTimeout(timer);
+  }, []);
+
+  const satName = hasConnection ? getSatelliteName(connectedSatelliteIndex) : null;
+  const noradId = hasConnection ? getNoradId(connectedSatelliteIndex) : null;
+
   return (
-    <div className="hud-panel p-3 w-[260px]">
+    <div className="hud-panel p-4 w-[280px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-2">
         Satellite Link
       </div>
 
       {/* Satellite identity */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-1">
         {hasConnection ? (
-          <span className="text-sm hud-glow-text tabular-nums">
-            SAT-{String(connectedSatelliteIndex).padStart(4, '0')}
+          <span className="text-sm hud-glow-text truncate">
+            {satName}
           </span>
         ) : (
           <span className="text-sm text-yellow-400 animate-pulse">Scanning...</span>
         )}
       </div>
+      {noradId && (
+        <div className="text-[10px] text-white/40 mb-2 tabular-nums">
+          NORAD {noradId}
+        </div>
+      )}
 
-      {/* Boresight readings + compass */}
-      <div className="flex items-center gap-3 mb-2">
-        <CompassIndicator azimuth={azimuth} />
-        <div className="flex-1 space-y-1">
-          <div className="flex justify-between items-baseline">
-            <span className="text-[11px] text-white/50">Azimuth</span>
-            <span className="text-sm tabular-nums hud-glow-text">{formatDegrees(azimuth)}</span>
-          </div>
-          <div className="flex justify-between items-baseline">
-            <span className="text-[11px] text-white/50">Elevation</span>
-            <span className="text-sm tabular-nums hud-glow-text">{formatDegrees(elevation)}</span>
-          </div>
+      {/* Boresight readings */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-1">
+        <div className="flex justify-between items-baseline">
+          <span className="text-[11px] text-white/50">Az</span>
+          <span className="text-sm tabular-nums hud-glow-text">{formatDegrees(azimuth)}</span>
+        </div>
+        <div className="flex justify-between items-baseline">
+          <span className="text-[11px] text-white/50">El</span>
+          <span className="text-sm tabular-nums hud-glow-text">{formatDegrees(elevation)}</span>
         </div>
       </div>
 
@@ -87,12 +116,52 @@ export default function SatelliteInfoPanel() {
       {/* Orbital info */}
       <div className="flex justify-between items-baseline mb-1">
         <span className="text-[11px] text-white/50">Altitude</span>
-        <span className="text-xs tabular-nums text-white/70">~550 km</span>
+        <span className="text-xs tabular-nums text-white/70">
+          {altitude !== null ? `${altitude.toFixed(1)} km` : '---'}
+        </span>
       </div>
       <div className="flex justify-between items-baseline">
         <span className="text-[11px] text-white/50">Velocity</span>
-        <span className="text-xs tabular-nums text-white/70">~7.5 km/s</span>
+        <span className="text-xs tabular-nums text-white/70">
+          {velocity !== null ? `${velocity.toFixed(2)} km/s` : '---'}
+        </span>
       </div>
+
+      {/* Latency cross-validation confidence (live mode only) */}
+      {(() => {
+        const conf = latencyConfidence(status?.ping, geometricLatency, demoMode);
+        if (!conf) return null;
+        return (
+          <>
+            <hr className="hud-divider my-2" />
+            <div
+              className="flex justify-between items-center"
+              title={`Measured ping ${status?.ping?.toFixed(0)}ms vs geometric ${geometricLatency?.toFixed(0)}ms (Δ${conf.delta.toFixed(0)}ms). Low confidence may indicate ISL routing or incorrect satellite guess.`}
+            >
+              <span className="text-[11px] text-white/50">Confidence</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`inline-block w-2 h-2 rounded-full ${conf.color}`} />
+                <span className="text-[10px] text-white/50 tabular-nums">{conf.label} (Δ{conf.delta.toFixed(0)}ms)</span>
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+      {/* Gateway and PoP */}
+      {(gateway || pop) && <hr className="hud-divider my-2" />}
+      {gateway && (
+        <div className="flex justify-between items-baseline mb-1" title="Starlink ground station relaying your traffic">
+          <span className="text-[11px] text-white/50">Gateway</span>
+          <span className="text-[10px] tabular-nums" style={{ color: '#ff9933' }}>{gateway}</span>
+        </div>
+      )}
+      {pop && (
+        <div className="flex justify-between items-baseline" title="Point of Presence — internet exchange where your traffic exits Starlink">
+          <span className="text-[11px] text-white/50">PoP</span>
+          <span className="text-[10px] tabular-nums" style={{ color: '#ff9933' }}>{pop}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,6 +11,9 @@ export interface DishStatus {
   azimuth: number;
   elevation: number;
   dropRate: number;
+  gpsSats: number;
+  antennaBoresightAz: number;
+  antennaBoresightEl: number;
   deviceId: string;
   softwareVersion: string;
 }
@@ -34,10 +37,13 @@ interface TelemetryState {
   dishStatus: DishStatus | null;
   history: TelemetryHistory;
   events: EventLogEntry[];
+  /** Geometric latency (ms) computed from satellite + gateway positions via speed of light */
+  geometricLatency: number | null;
 
   updateStatus: (status: DishStatus) => void;
   addEvent: (entry: EventLogEntry) => void;
   pushHistory: (values: { ping: number; downlink: number; uplink: number; snr: number }) => void;
+  setGeometricLatency: (ms: number) => void;
 }
 
 function pushToRing(arr: number[], value: number): number[] {
@@ -57,8 +63,10 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
     snr: [],
   },
   events: [],
+  geometricLatency: null,
 
   updateStatus: (status) => set({ dishStatus: status }),
+  setGeometricLatency: (ms) => set({ geometricLatency: ms }),
 
   addEvent: (entry) =>
     set((state) => ({

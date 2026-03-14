@@ -8,6 +8,35 @@ import type { TLEData } from './tle-fetcher';
 
 export type SatRec = ReturnType<typeof satellite.twoline2satrec>;
 
+export interface SatelliteOrbitalData {
+  altitudeKm: number;
+  velocityKmS: number;
+}
+
+/**
+ * Propagate a single satellite and return its real altitude and velocity.
+ */
+export function propagateSingle(satrec: SatRec, date: Date): SatelliteOrbitalData | null {
+  try {
+    const result = satellite.propagate(satrec, date);
+    if (!result || !result.position || typeof result.position === 'boolean') return null;
+
+    const posEci = result.position as satellite.EciVec3<number>;
+    const velEci = result.velocity as satellite.EciVec3<number>;
+    const gmst = satellite.gstime(date);
+    const gd = satellite.eciToGeodetic(posEci, gmst);
+
+    const velocityKmS = Math.sqrt(velEci.x ** 2 + velEci.y ** 2 + velEci.z ** 2);
+
+    return {
+      altitudeKm: gd.height,
+      velocityKmS,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Initialize satellite records from TLE data.
  * Returns array of satrec objects (some may be invalid).
@@ -71,12 +100,11 @@ export function propagateBatch(
       const lon = positionGd.longitude; // radians
       const alt = positionGd.height; // km
 
-      // Compressed scale: real LEO ~550km, Earth ~6371km radius
-      const radius = 1 + (alt / 6371) * 0.15;
+      const radius = 1 + alt / 6371;
 
       output[outIdx] = radius * Math.cos(lat) * Math.cos(lon);
       output[outIdx + 1] = radius * Math.sin(lat);
-      output[outIdx + 2] = radius * Math.cos(lat) * Math.sin(lon);
+      output[outIdx + 2] = -radius * Math.cos(lat) * Math.sin(lon);
     } catch {
       // Propagation failed — place at origin
       output[outIdx] = 0;

@@ -6,7 +6,9 @@
     "dev": "npx tsx watch server.ts",
     "dev:next": "next dev",
     "build": "next build",
-    "start": "npx tsx server.ts"
+    "start": "npx tsx server.ts",
+    "test": "vitest run",
+    "update-gs": "npx tsx scripts/update-ground-stations.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
@@ -31,6 +33,7 @@
     "@types/three": "^0.183.1",
     "@types/ws": "^8.18.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.0"
   }
 }

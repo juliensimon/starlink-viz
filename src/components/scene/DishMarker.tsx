@@ -3,19 +3,10 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { geodeticToCartesian } from '@/lib/utils/coordinates';
-
-const DISH_LAT = 48.8566; // Paris default
-const DISH_LON = 2.3522;
-
-/** Convert degrees to radians */
-function degToRad(deg: number): number {
-  return (deg * Math.PI) / 180;
-}
+import { DISH_POS } from '@/lib/utils/dish-frame';
 
 export function getDishPosition(): THREE.Vector3 {
-  const { x, y, z } = geodeticToCartesian(degToRad(DISH_LAT), degToRad(DISH_LON), 0, 1);
-  return new THREE.Vector3(x, y, z);
+  return new THREE.Vector3(DISH_POS.x, DISH_POS.y, DISH_POS.z);
 }
 
 export default function DishMarker() {

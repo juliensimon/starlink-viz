@@ -19,7 +19,7 @@ function MetricCard({ label, value, unit, data, color = '#00ffff' }: MetricCardP
         <span className="text-lg tabular-nums hud-glow-text-strong">{value}</span>
         <span className="text-[10px] text-white/40">{unit}</span>
       </div>
-      <MiniChart data={data} width={140} height={32} color={color} fillColor={color} />
+      <MiniChart data={data} width={110} height={28} color={color} fillColor={color} />
     </div>
   );
 }
@@ -45,12 +45,12 @@ export default function TelemetryPanel() {
   const ulHistory = history.uplink.map(bytesToMbps);
 
   return (
-    <div className="hud-panel p-3 w-[320px]">
+    <div className="hud-panel p-4 w-[280px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-3">
         Telemetry
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-3">
         <MetricCard
           label="Ping"
           value={ping.toFixed(0)}

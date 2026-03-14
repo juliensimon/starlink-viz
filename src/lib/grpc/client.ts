@@ -88,20 +88,28 @@ export async function getStatus(): Promise<DishStatus | null> {
           if (status.alerts.slowEthernetSpeeds) alerts.push('slow_ethernet_speeds');
         }
 
+        const obstructionPct = status.obstructionStats
+          ? (status.obstructionStats.fractionObstructed || 0) * 100
+          : 0;
+
+        // SNR is no longer directly reported; use isSnrAboveNoiseFloor as a proxy
+        const snrEstimate = status.isSnrAboveNoiseFloor ? 10.5 : 5.0;
+
         resolve({
           deviceId: status.deviceInfo?.id || 'unknown',
           hardwareVersion: status.deviceInfo?.hardwareVersion || 'unknown',
           softwareVersion: status.deviceInfo?.softwareVersion || 'unknown',
           state: status.deviceState ? 'CONNECTED' : 'UNKNOWN',
           uptime: Number(status.deviceState?.uptimeS || 0),
-          snr: status.snr || 0,
+          snr: snrEstimate,
           downlinkThroughput: status.downlinkThroughputBps || 0,
           uplinkThroughput: status.uplinkThroughputBps || 0,
           popPingLatency: status.popPingLatencyMs || 0,
           popPingDropRate: status.popPingDropRate || 0,
-          obstructionPercentTime: status.obstructionPercentTime || 0,
+          obstructionPercentTime: obstructionPct,
           boresightAzimuth: status.boresightAzimuthDeg || 0,
           boresightElevation: status.boresightElevationDeg || 0,
+          gpsSats: status.gpsStats?.gpsSats || 0,
           alerts,
         });
       } catch (parseErr) {
@@ -133,11 +141,15 @@ export async function getHistory(): Promise<DishHistory | null> {
           return;
         }
 
+        const pingArr = history.popPingLatencyMs || [];
+        // SNR history not available from dish; fill with constant estimate
+        const snrArr = pingArr.map(() => 10.5);
+
         resolve({
-          pingLatency: history.popPingLatencyMs || [],
+          pingLatency: pingArr,
           downlinkThroughput: history.downlinkThroughputBps || [],
           uplinkThroughput: history.uplinkThroughputBps || [],
-          snr: history.snr || [],
+          snr: snrArr,
         });
       } catch (parseErr) {
         console.error('Failed to parse gRPC history response:', parseErr);
