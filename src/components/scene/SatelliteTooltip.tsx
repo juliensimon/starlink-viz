@@ -10,6 +10,8 @@ export interface TooltipData {
   name: string;
   noradId: string;
   altitude: string;
+  launchYear: number | null;
+  launchNum: string | null;
   isConnected: boolean;
   x: number;
   y: number;
@@ -17,6 +19,15 @@ export interface TooltipData {
 
 function parseNoradId(line1: string): string {
   return line1.substring(2, 7).trim();
+}
+
+function parseLaunchInfo(line1: string): { year: number; launch: string } | null {
+  const intlDesig = line1.substring(9, 17).trim();
+  if (!intlDesig) return null;
+  const yy = parseInt(intlDesig.substring(0, 2), 10);
+  const year = yy >= 57 ? 1900 + yy : 2000 + yy;
+  const launch = intlDesig.substring(2, 5).trim();
+  return { year, launch };
 }
 
 function estimateAltitude(x: number, y: number, z: number): string {
@@ -122,10 +133,13 @@ export default function SatelliteTooltip() {
       const pi = bestIdx * 3;
       _projected.set(positions[pi], positions[pi + 1], positions[pi + 2]).project(camera);
 
+      const launch = parseLaunchInfo(tle.line1);
       dispatchTooltip({
         name: tle.name,
         noradId: parseNoradId(tle.line1),
         altitude: estimateAltitude(positions[pi], positions[pi + 1], positions[pi + 2]),
+        launchYear: launch?.year ?? null,
+        launchNum: launch?.launch ?? null,
         isConnected: bestIdx === connectedSatelliteIndex,
         x: ((_projected.x + 1) / 2) * rect.width + rect.left,
         y: ((-_projected.y + 1) / 2) * rect.height + rect.top,

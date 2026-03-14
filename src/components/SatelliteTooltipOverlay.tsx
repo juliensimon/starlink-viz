@@ -60,6 +60,9 @@ export default function SatelliteTooltipOverlay() {
             <div className="text-[var(--color-accent)] font-semibold text-xs mb-1">{tooltip.name}</div>
             <div className="text-[var(--color-text-dim)]">NORAD: {tooltip.noradId}</div>
             <div className="text-[var(--color-text-dim)]">ALT: {tooltip.altitude}</div>
+            {tooltip.launchYear && (
+              <div className="text-[var(--color-text-dim)]">Launched: {tooltip.launchYear}</div>
+            )}
             <div className="mt-1">
               {tooltip.isConnected ? (
                 <span className="text-cyan-400 font-semibold">Connected</span>
