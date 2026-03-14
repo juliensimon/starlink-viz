@@ -39,7 +39,7 @@ Single-page app with a full-viewport 3D canvas and HUD overlay:
 
 ### State Management
 
-- `src/stores/app-store.ts` — Zustand store for UI state (selected satellite, view mode, demo mode, altitude filter)
+- `src/stores/app-store.ts` — Zustand store for UI state (selected satellite, view mode, demo mode, altitude filter, ISL prediction, demo location)
 - `src/stores/telemetry-store.ts` — Zustand store for dish telemetry data and geometric latency (for cross-validation)
 
 ### Satellite Propagation
@@ -67,6 +67,8 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 - **Latency model** — speed-of-light geometry + 6ms base processing RTT + 0.3ms OEO per ISL hop + per-GS backhaul
 - **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 - **Toggle** — `islPrediction` in app-store, green pill-switch in ViewControls
+- **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
+- **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 
 ### Ground Stations (`data/ground-stations.json`)
 
