@@ -8,6 +8,8 @@ export default function ViewControls() {
   const setAutoRotate = useAppStore((s) => s.setAutoRotate);
   const altitudeFilter = useAppStore((s) => s.altitudeFilter);
   const setAltitudeFilter = useAppStore((s) => s.setAltitudeFilter);
+  const islPrediction = useAppStore((s) => s.islPrediction);
+  const setISLPrediction = useAppStore((s) => s.setISLPrediction);
   const focusDish = useAppStore((s) => s.focusDish);
   const demoMode = useAppStore((s) => s.demoMode);
   const [switching, setSwitching] = useState(false);
@@ -106,6 +108,30 @@ export default function ViewControls() {
             Operational only
           </span>
           <div className="text-[9px] text-white/45 leading-tight">Per-shell altitude filtering</div>
+        </div>
+      </button>
+
+      {/* ISL Prediction toggle */}
+      <button
+        onClick={() => setISLPrediction(!islPrediction)}
+        className="flex items-center gap-2 w-full text-left mb-2 group"
+      >
+        <div
+          className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
+            islPrediction ? 'bg-green-500/40 justify-end' : 'bg-white/10 justify-start'
+          }`}
+        >
+          <div
+            className={`w-2.5 h-2.5 rounded-full mx-0.5 transition-colors duration-200 ${
+              islPrediction ? 'bg-green-400' : 'bg-white/40'
+            }`}
+          />
+        </div>
+        <div>
+          <span className="text-[11px] text-white/70 group-hover:text-white/90 transition-colors">
+            ISL Prediction
+          </span>
+          <div className="text-[9px] text-white/45 leading-tight">Laser link route estimation</div>
         </div>
       </button>
 

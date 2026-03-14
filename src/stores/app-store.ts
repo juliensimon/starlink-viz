@@ -12,6 +12,7 @@ interface AppState {
   wsConnected: boolean;
   altitudeFilter: boolean; // filter to operational altitude band (530-580 km)
   hudVisible: boolean;
+  islPrediction: boolean;
 
   setSelectedSatellite: (index: number | null) => void;
   setConnectedSatellite: (index: number | null) => void;
@@ -24,6 +25,7 @@ interface AppState {
   setWsConnected: (connected: boolean) => void;
   setAltitudeFilter: (enabled: boolean) => void;
   setHudVisible: (visible: boolean) => void;
+  setISLPrediction: (enabled: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -38,6 +40,7 @@ export const useAppStore = create<AppState>((set) => ({
   wsConnected: false,
   altitudeFilter: true,
   hudVisible: true,
+  islPrediction: true,
 
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
@@ -50,4 +53,5 @@ export const useAppStore = create<AppState>((set) => ({
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setAltitudeFilter: (enabled) => set({ altitudeFilter: enabled }),
   setHudVisible: (visible) => set({ hudVisible: visible }),
+  setISLPrediction: (enabled) => set({ islPrediction: enabled }),
 }));

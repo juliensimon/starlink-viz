@@ -53,6 +53,21 @@ export const SHELL_ALT_BANDS: { minInc: number; maxInc: number; minAlt: number; 
   { minInc: 80, maxInc: 180, minAlt: 460, maxAlt: 600 }, // 97.6° — observed 550-590 km
 ];
 
+/** ISL (Inter-Satellite Laser Link) constants */
+export const ISL_PROCESSING_DELAY_MS = 0.3;  // OEO conversion per hop; real measured ~0.2-0.4ms
+export const ISL_MAX_RANGE_KM = 5016;
+export const ISL_MAX_HOPS = 4;  // typical real routes are 1-3 hops; 4 covers edge cases
+export const ISL_GRAPH_REBUILD_MS = 30000;
+export const ISL_PATHFIND_INTERVAL_MS = 5000;
+/** Latitude (degrees) above which cross-plane ISL links are disabled —
+ *  orbital planes converge near the poles and relative angular rate
+ *  exceeds gimbal tracking capability of the laser terminals. */
+export const ISL_POLAR_EXCLUSION_DEG = 70;
+/** Base end-to-end processing overhead (ms RTT): dish modem (~1ms),
+ *  satellite bent-pipe (~0.3ms), GS RF processing (~0.5ms),
+ *  GS→PoP network stack (~0.5ms), return path same ≈ 5-8ms total. */
+export const BASE_PROCESSING_RTT_MS = 6;
+
 /** Check if a satellite is at operational altitude for its shell */
 export function isOperationalAltitude(inclination: number, altitudeKm: number): boolean {
   for (const band of SHELL_ALT_BANDS) {
