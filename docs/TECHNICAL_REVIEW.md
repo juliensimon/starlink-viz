@@ -56,7 +56,7 @@ Public Internet
 Key details:
 
 - The dish uses a **phased-array antenna** — it steers its beam electronically with no moving parts (Gen 2+). Think of it like noise-canceling headphones, but for radio waves: by precisely timing thousands of tiny antenna elements, it can point its beam in any direction within its steering range. A small motor tilts the whole panel during initial setup.
-- Satellites orbit in **multiple shells** at different inclinations and altitudes (540–570 km). The primary shells include 53° (covering most populated areas), 70°, and 97.6° (polar orbits for global coverage), with the 43° shell actively being filled. A 33° shell is FCC-authorized but not yet launched (as of March 2026). Each shell uses dozens of orbital planes with ~22 satellites per plane. The app visualizes five shells by inclination color: 53° (blue), 43° (orange), 33° (gold), 70° (teal), and 97.6° (pink-red).
+- Satellites orbit in **multiple shells** at different inclinations and altitudes (570–900 km observed). The primary shells include 53° (covering most populated areas), 70°, and 97.6° (polar orbits for global coverage), with the 43° shell actively being filled. A 33° shell is FCC-authorized but not yet launched (as of March 2026). Each shell uses dozens of orbital planes with ~22 satellites per plane. The app visualizes five shells by inclination color: 53° (blue), 43° (orange), 33° (gold), 70° (teal), and 97.6° (pink-red).
   - **Source:** [SpaceX FCC filings](https://fcc.report/IBFS/SAT-MOD-20200417-00037); [Jonathan McDowell's tracking](https://planet4589.org/space/con/star/stats.html)
 - **Handoffs** happen every 15–90 seconds (community-observed range). The dish pre-computes the next satellite and establishes a link to it *before* dropping the current one (make-before-break), so you don't notice the switch.
   - **Source:** Community observation via [r/Starlink](https://reddit.com/r/Starlink) and [Oleg Kutkov's research](https://olegkutkov.me/)
@@ -166,22 +166,25 @@ The app fetches ~7,500 Starlink satellite TLEs. CelesTrak updates its data rough
 
 **Gen2 Upgrade (FCC DA 26-36, Jan 2026) — additional 7,500 satellites authorized** at VLEO altitudes (340–485 km) with inclinations of 28°/32°, 43°, and 53°. Not yet populated. These shells are where Starship-launched full-size V2 satellites will eventually operate.
 
-The app's per-shell operational altitude bands:
+The app's per-shell operational altitude bands are derived from **SGP4-propagated instantaneous altitudes** (March 2026), not mean-motion averages or FCC-filed altitudes — both of which can differ by 100+ km from the actual position due to orbital drag modeling.
 
-| Shell | Operational band | Rationale |
-|-------|-----------------|-----------|
-| 53° | 470–560 km | Gen1 lowering to ~480 km + Gen1 at 540–550 km + Gen2 at 525 km |
-| 43° | 520–540 km | Gen2-B target 530 km |
-| 33° | 525–545 km | Gen2-C target 535 km (not yet launched) |
-| 70° | 560–580 km | Gen1 at 570 km |
-| 97.6° | 550–570 km | Gen1 at 560 km |
+| Shell | FCC-filed | SGP4-observed clusters | Operational band |
+|-------|-----------|----------------------|-----------------|
+| 33° | 535 km | Not yet launched | 460–570 km (placeholder) |
+| 43° | 530 km | 460–570 km | 460–570 km |
+| 53° | 525–550 km | 480–490 km (lowered Gen1) + 540–560 km (original) | 460–570 km |
+| 70° | 570 km | ~880–900 km | 460–910 km |
+| 97.6° | 560 km | 550–590 km | 460–600 km |
+
+Discrepancies between filed and observed altitudes are substantial. The 70° shell operates ~330 km higher than its FCC filing. The 53° shell has two distinct clusters: Gen1 satellites intentionally lowered to ~480 km (announced January 2026) and those still at original 540–560 km altitude. Satellites at ~280 km in any shell are orbit-raising (just launched) and correctly excluded.
 
 This is a heuristic with known limitations:
 
-- **False positives:** Failed satellites at operational altitude stay there for months before drag brings them down — the altitude filter counts them as "operational" even though they're not serving traffic. This is why the app's operational percentage may be slightly higher than the real fleet's.
-- **Ambiguity in the 53° band:** A satellite at ~530 km with 53° inclination could be a Gen2 satellite at its target altitude OR a Gen1 satellite that's deorbiting from 540–550 km. The TLE alone can't distinguish them.
-- **Orbit-raising satellites:** Newly launched satellites climbing from ~300 km to their target altitude will briefly pass through other shells' altitude bands.
-- Jonathan McDowell notes that actual shell altitudes don't always match licensed altitudes, and it can take time to distinguish whether a newly deployed satellite has reached its final altitude.
+- **False positives:** Failed satellites at operational altitude stay there for months before drag brings them down — the altitude filter counts them as "operational" even though they're not serving traffic.
+- **Orbit-raising satellites:** Newly launched satellites at ~280 km are correctly excluded, but satellites mid-climb (e.g., 400–460 km) are also excluded even if they may already be serving traffic during ascent.
+- **Non-commercial objects:** The CelesTrak "Starlink" group may include Starshield (military/government) objects that NORAD catalogs alongside commercial Starlink satellites. These operate under different parameters and may be at non-standard altitudes, particularly in the 97.6° polar shell.
+- **Filed vs observed drift:** The observed altitudes may shift over time as SpaceX adjusts the constellation. The bands should be periodically validated against current TLE data.
+- **Future VLEO conflict:** When SpaceX populates the authorized VLEO shells (340–365 km), the 460 km lower bound will become ambiguous — a satellite at 360 km could be orbit-raising to 570 km or operating in a VLEO shell. This will require new discrimination logic (likely by launch date or NORAD ID range).
 
 **References:**
 - [FCC 22-91 — Gen2 Authorization (Dec 2022)](https://docs.fcc.gov/public/attachments/FCC-22-91A1.pdf)
@@ -270,7 +273,7 @@ This section documents every place where the app goes beyond what public data an
 
 1. Gets the dish's physical antenna orientation (`antennaBoresightAz`, `antennaBoresightEl`) from gRPC telemetry
 2. Converts this to a 3D direction vector using `azElToDirection()`
-3. Iterates all satellites, filtering to those within the global operational altitude band (470–580 km) and above 25° elevation
+3. Iterates all satellites, filtering to those within the global operational altitude band (525–920 km) and above 25° elevation
 4. Checks if each candidate is within the 25° steering cone (dot product with boresight direction > cos(25°))
 5. Ranks by dot product (best alignment wins); when two satellites score within ~0.01 of each other, breaks ties by **total path length** (`totalPathLength()` = dish-to-sat + sat-to-nearest-GS distance), preferring the shorter path as a latency proxy
 6. **Hysteresis:** if the current satellite is still in the cone and above minimum elevation, it sticks — the app won't switch unless the current satellite leaves the valid region

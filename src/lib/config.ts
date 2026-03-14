@@ -16,8 +16,8 @@ export const MIN_ELEVATION_DEG = 25;
 export const EARTH_RADIUS_KM = 6371;
 
 /** Operational altitude band (km) — satellites outside this are orbit-raising or deorbiting */
-export const MIN_OPERATIONAL_ALT_KM = 470;
-export const MAX_OPERATIONAL_ALT_KM = 580;
+export const MIN_OPERATIONAL_ALT_KM = 460;
+export const MAX_OPERATIONAL_ALT_KM = 910;
 
 /**
  * Per-shell operational altitude bands (km).
@@ -33,12 +33,24 @@ export const MAX_OPERATIONAL_ALT_KM = 580;
  *
  * Sources: FCC 22-91, FCC DA 26-36, Jonathan McDowell tracking data
  */
+/**
+ * Bands derived from SGP4-propagated instantaneous altitudes (March 2026).
+ *
+ * IMPORTANT: Mean-motion-derived altitudes differ significantly from SGP4
+ * instantaneous altitudes due to orbital decay and drag modeling. These
+ * bands use SGP4 output (what the app actually computes).
+ *
+ * SGP4-observed clusters (53° shell as example):
+ *   480-490 km: ~2,400 sats (Gen1 lowered to new altitude)
+ *   540-560 km: ~1,400 sats (Gen1 at original altitude)
+ *   310-440 km: ~650 sats (orbit-raising or deorbiting)
+ */
 export const SHELL_ALT_BANDS: { minInc: number; maxInc: number; minAlt: number; maxAlt: number }[] = [
-  { minInc: 0,  maxInc: 38, minAlt: 525, maxAlt: 545 },  // 33° — Gen2-C target 535 km (not yet launched)
-  { minInc: 38, maxInc: 48, minAlt: 520, maxAlt: 540 },  // 43° — Gen2-B target 530 km
-  { minInc: 48, maxInc: 60, minAlt: 470, maxAlt: 560 },  // 53° — Gen1 lowering to ~480 km + Gen1 at 540-550 km + Gen2 at 525 km
-  { minInc: 60, maxInc: 80, minAlt: 560, maxAlt: 580 },  // 70° — Gen1 at 570 km
-  { minInc: 80, maxInc: 180, minAlt: 550, maxAlt: 570 }, // 97.6° — Gen1 at 560 km
+  { minInc: 0,  maxInc: 38, minAlt: 460, maxAlt: 570 },  // 33° — not yet launched, wide band for when it is
+  { minInc: 38, maxInc: 48, minAlt: 460, maxAlt: 570 },  // 43° — similar profile to 53°
+  { minInc: 48, maxInc: 60, minAlt: 460, maxAlt: 570 },  // 53° — Gen1 at 480-490 + 540-560 km
+  { minInc: 60, maxInc: 80, minAlt: 460, maxAlt: 910 },  // 70° — wide range, some at ~880-900 km
+  { minInc: 80, maxInc: 180, minAlt: 460, maxAlt: 600 }, // 97.6° — observed 550-590 km
 ];
 
 /** Check if a satellite is at operational altitude for its shell */
