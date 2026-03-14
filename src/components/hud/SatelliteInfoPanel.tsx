@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 import { useAppStore } from '@/stores/app-store';
 import { formatDegrees } from '@/lib/utils/formatting';
-import { getSatelliteName, getNoradId, getConnectedOrbitalData, getConnectedGroundStation } from '@/lib/satellites/satellite-store';
+import { getSatelliteName, getNoradId, getConnectedOrbitalData, getConnectedGroundStation, getCurrentRoute, setDetectedPop } from '@/lib/satellites/satellite-store';
+import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
 
 function latencyConfidence(
   measuredPing: number | undefined,
@@ -28,11 +29,16 @@ export default function SatelliteInfoPanel() {
   const elevation = status?.elevation ?? 0;
   const hasConnection = connectedSatelliteIndex !== null;
 
-  // Poll orbital data and gateway from satellite store
+  const islPrediction = useAppStore((s) => s.islPrediction);
+
+  // Poll orbital data, gateway, and route from satellite store
   const [altitude, setAltitude] = useState<number | null>(null);
   const [velocity, setVelocity] = useState<number | null>(null);
   const [gateway, setGateway] = useState<string | null>(null);
   const [pop, setPop] = useState<string | null>(null);
+  const [routeType, setRouteType] = useState<'direct' | 'isl' | null>(null);
+  const [hopCount, setHopCount] = useState(0);
+  const [routingGS, setRoutingGS] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -45,6 +51,19 @@ export default function SatelliteInfoPanel() {
         setVelocity(null);
       }
       setGateway(getConnectedGroundStation());
+
+      // Poll current route
+      const route = getCurrentRoute();
+      if (route) {
+        setRouteType(route.type);
+        setHopCount(route.hopCount);
+        const gs = GROUND_STATIONS[route.groundStationIndex];
+        setRoutingGS(gs?.name ?? null);
+      } else {
+        setRouteType(null);
+        setHopCount(0);
+        setRoutingGS(null);
+      }
     }, 500);
     return () => clearInterval(interval);
   }, []);
@@ -57,7 +76,10 @@ export default function SatelliteInfoPanel() {
       fetch('/api/pop')
         .then((r) => r.json())
         .then((d) => {
-          if (d.pop) setPop(d.pop);
+          if (d.pop) {
+            setPop(d.pop);
+            if (d.pop !== 'Unknown') setDetectedPop(d.pop);
+          }
           if (d.pop === 'Unknown' && retries < 3) {
             retries++;
             timer = setTimeout(fetchPop, 10000);
@@ -147,6 +169,28 @@ export default function SatelliteInfoPanel() {
           </>
         );
       })()}
+
+      {/* ISL route info */}
+      {islPrediction && routeType && (
+        <>
+          <hr className="hud-divider my-2" />
+          <div className="flex justify-between items-center mb-1" title={routeType === 'isl' ? `Traffic routes through ${hopCount} inter-satellite laser hops` : 'Direct bent-pipe route to nearest ground station'}>
+            <span className="text-[11px] text-white/50">Route</span>
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-block w-2 h-2 rounded-full ${routeType === 'isl' ? 'bg-green-400' : 'bg-cyan-400'}`} />
+              <span className="text-[10px] text-white/50 tabular-nums">
+                {routeType === 'isl' ? `ISL (${hopCount} hop${hopCount !== 1 ? 's' : ''})` : 'Direct'}
+              </span>
+            </div>
+          </div>
+          {routeType === 'isl' && routingGS && routingGS !== gateway && (
+            <div className="flex justify-between items-baseline mb-1" title="Ground station traffic routes through via ISL hops (may differ from nearest)">
+              <span className="text-[11px] text-white/50">Routing GS</span>
+              <span className="text-[10px] tabular-nums" style={{ color: '#44ff88' }}>{routingGS}</span>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Gateway and PoP */}
       {(gateway || pop) && <hr className="hud-divider my-2" />}

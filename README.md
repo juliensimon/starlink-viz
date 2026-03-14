@@ -22,7 +22,8 @@ Real-time 3D Starlink satellite tracker and mission control dashboard. Track eve
 - **Astronomically accurate Sun and Moon** with real-time positioning, lens flare, and natural lunar phases
 - **Satellite handoff tracking** — monitors when your dish switches between satellites
 - **204 ground stations** from FCC/international filings, with operational/planned status
-- **Connection beam** visualization from dish to connected satellite
+- **ISL routing prediction** — models inter-satellite laser links with PoP-constrained gateway selection, line-of-sight checks, and green ISL beam visualization
+- **Connection beam** visualization from dish to connected satellite (cyan uplink, green ISL hops, orange downlink)
 - **Day/night globe** with city lights on the dark side and atmospheric glow
 
 ## Quick start
