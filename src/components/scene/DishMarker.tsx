@@ -4,8 +4,16 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DISH_POS } from '@/lib/utils/dish-frame';
+import { geodeticToCartesian } from '@/lib/utils/coordinates';
+import { useAppStore } from '@/stores/app-store';
 
 export function getDishPosition(): THREE.Vector3 {
+  const demoLoc = useAppStore.getState().demoLocation;
+  if (demoLoc) {
+    const rad = (d: number) => (d * Math.PI) / 180;
+    const p = geodeticToCartesian(rad(demoLoc.lat), rad(demoLoc.lon), 0, 1);
+    return new THREE.Vector3(p.x, p.y, p.z);
+  }
   return new THREE.Vector3(DISH_POS.x, DISH_POS.y, DISH_POS.z);
 }
 

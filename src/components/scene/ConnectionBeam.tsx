@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '@/stores/app-store';
 import { useTelemetryStore } from '@/stores/telemetry-store';
-import { getPositionsArray, getSatelliteCount, getSatelliteName, setConnectedGroundStation, setCurrentRoute, getCurrentRoute } from '@/lib/satellites/satellite-store';
+import { getPositionsArray, getSatelliteCount, getSatelliteName, setConnectedGroundStation, setCurrentRoute, getCurrentRoute, setDetectedPop } from '@/lib/satellites/satellite-store';
 import { geodeticToCartesian } from '@/lib/utils/coordinates';
 import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
 import { DISH_POS, computeAzEl, azElToDirection } from '@/lib/utils/dish-frame';
@@ -91,6 +91,47 @@ function findNearestGS3D(satPos: THREE.Vector3): THREE.Vector3 {
     }
   }
   return nearest;
+}
+
+/**
+ * Find the nearest operational satellite above a given position.
+ * Used for demo locations where the boresight cone doesn't apply.
+ */
+function findNearestSatAbove(dishX: number, dishY: number, dishZ: number): number | null {
+  const positions = getPositionsArray();
+  const count = getSatelliteCount();
+  if (!positions || count === 0) return null;
+
+  // Dish normal (unit vector pointing up from surface)
+  const dLen = Math.sqrt(dishX * dishX + dishY * dishY + dishZ * dishZ);
+  if (dLen < 0.001) return null;
+  const nx = dishX / dLen, ny = dishY / dLen, nz = dishZ / dLen;
+
+  let bestIdx = -1;
+  let bestDist = Infinity;
+
+  for (let i = 0; i < count; i++) {
+    const pi = i * 3;
+    const x = positions[pi], y = positions[pi + 1], z = positions[pi + 2];
+    if (x === 0 && y === 0 && z === 0) continue;
+
+    const posLen = Math.sqrt(x * x + y * y + z * z);
+    const altKm = (posLen - 1) * EARTH_RADIUS_KM;
+    if (altKm < MIN_OPERATIONAL_ALT_KM || altKm > MAX_OPERATIONAL_ALT_KM) continue;
+
+    // Check elevation: satellite must be above the horizon (dot with normal > 0)
+    const dx = x - dishX, dy = y - dishY, dz = z - dishZ;
+    const dot = dx * nx + dy * ny + dz * nz;
+    if (dot <= 0) continue; // below horizon
+
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq < bestDist) {
+      bestDist = distSq;
+      bestIdx = i;
+    }
+  }
+
+  return bestIdx >= 0 ? bestIdx : null;
 }
 
 // Total one-way geometric path length in unit-sphere units: dish-to-sat
@@ -399,13 +440,26 @@ export default function ConnectionBeam() {
   const _islStart = useMemo(() => new THREE.Vector3(), []);
   const _islEnd = useMemo(() => new THREE.Vector3(), []);
   const _lastSatVec = useMemo(() => new THREE.Vector3(), []);
+  const _demoDishVec = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, delta) => {
     const positions = getPositionsArray();
     if (!positions) return;
 
     const now = performance.now();
-    const islEnabled = useAppStore.getState().islPrediction;
+    const appState = useAppStore.getState();
+    const islEnabled = appState.islPrediction;
+    const demoLoc = appState.demoLocation;
+
+    // Compute effective dish position — override for demo locations
+    let dishVec: THREE.Vector3 = DISH_VEC;
+    if (demoLoc) {
+      const dp = geodeticToCartesian(degToRad(demoLoc.lat), degToRad(demoLoc.lon), 0, 1);
+      _demoDishVec.set(dp.x, dp.y, dp.z);
+      dishVec = _demoDishVec;
+      // Set the PoP for pathfinder constraint
+      setDetectedPop(demoLoc.pop);
+    }
 
     // Rebuild ISL graph periodically
     if (islEnabled && now - lastGraphBuildRef.current > ISL_GRAPH_REBUILD_MS) {
@@ -417,46 +471,51 @@ export default function ConnectionBeam() {
     if (now - lastSelectionRef.current > 500) {
       lastSelectionRef.current = now;
 
-      // Same logic for both demo and live mode — dish doesn't expose
-      // active beam direction, only physical antenna orientation.
-      const result = findBestSatellite(connectedSatelliteIndex);
-      if (result.index !== null) {
-        if (result.index !== connectedSatelliteIndex) {
-          setConnectedSatellite(result.index);
+      if (demoLoc) {
+        // Demo location: find nearest overhead satellite (no boresight cone)
+        const nearestSat = findNearestSatAbove(dishVec.x, dishVec.y, dishVec.z);
+        if (nearestSat !== null && nearestSat !== connectedSatelliteIndex) {
+          setConnectedSatellite(nearestSat);
         }
+      } else {
+        // Normal mode: use boresight cone logic
+        const result = findBestSatellite(connectedSatelliteIndex);
+        if (result.index !== null) {
+          if (result.index !== connectedSatelliteIndex) {
+            setConnectedSatellite(result.index);
+          }
 
-        // Only update store when az/el actually changed (C3 fix)
-        const azRounded = Math.round(result.az * 100) / 100;
-        const elRounded = Math.round(result.el * 100) / 100;
-        if (azRounded !== lastAzRef.current || elRounded !== lastElRef.current) {
-          lastAzRef.current = azRounded;
-          lastElRef.current = elRounded;
-          const store = useTelemetryStore.getState();
-          if (store.dishStatus) {
-            store.updateStatus({
-              ...store.dishStatus,
-              azimuth: azRounded,
-              elevation: elRounded,
-            });
+          const azRounded = Math.round(result.az * 100) / 100;
+          const elRounded = Math.round(result.el * 100) / 100;
+          if (azRounded !== lastAzRef.current || elRounded !== lastElRef.current) {
+            lastAzRef.current = azRounded;
+            lastElRef.current = elRounded;
+            const store = useTelemetryStore.getState();
+            if (store.dishStatus) {
+              store.updateStatus({
+                ...store.dishStatus,
+                azimuth: azRounded,
+                elevation: elRounded,
+              });
+            }
           }
         }
       }
     }
 
     // Run pathfinder periodically
-    const currentIdx = useAppStore.getState().connectedSatelliteIndex;
+    const currentIdx = appState.connectedSatelliteIndex;
     if (islEnabled && currentIdx !== null && now - lastPathfindRef.current > ISL_PATHFIND_INTERVAL_MS) {
       lastPathfindRef.current = now;
       const telState = useTelemetryStore.getState();
       const measuredPing = telState.dishStatus?.ping ?? null;
       const route = findBestRoute(
         currentIdx,
-        { x: DISH_VEC.x, y: DISH_VEC.y, z: DISH_VEC.z },
+        { x: dishVec.x, y: dishVec.y, z: dishVec.z },
         measuredPing,
       );
       setCurrentRoute(route);
 
-      // Update the connected ground station name based on route
       if (route) {
         const gs = GROUND_STATIONS[route.groundStationIndex];
         if (gs) setConnectedGroundStation(gs.name);
@@ -488,7 +547,7 @@ export default function ConnectionBeam() {
 
     // Dish → satellite beam (always cyan)
     const beamPosAttr = beamLine.geometry.getAttribute('position') as THREE.BufferAttribute;
-    writeCurvePoints(DISH_VEC, _satPos, 1.3, beamPosAttr.array as Float32Array, BEAM_SEGMENTS);
+    writeCurvePoints(dishVec, _satPos, 1.3, beamPosAttr.array as Float32Array, BEAM_SEGMENTS);
     beamPosAttr.needsUpdate = true;
     (beamLine.material as THREE.LineBasicMaterial).opacity = 0.4 * opacity;
 
@@ -501,9 +560,9 @@ export default function ConnectionBeam() {
       const t = tValues[i];
       const omt = 1 - t;
       const pIdx = i * 3;
-      particleArray[pIdx] = omt * omt * DISH_VEC.x + 2 * omt * t * _control.x + t * t * _satPos.x;
-      particleArray[pIdx + 1] = omt * omt * DISH_VEC.y + 2 * omt * t * _control.y + t * t * _satPos.y;
-      particleArray[pIdx + 2] = omt * omt * DISH_VEC.z + 2 * omt * t * _control.z + t * t * _satPos.z;
+      particleArray[pIdx] = omt * omt * dishVec.x + 2 * omt * t * _control.x + t * t * _satPos.x;
+      particleArray[pIdx + 1] = omt * omt * dishVec.y + 2 * omt * t * _control.y + t * t * _satPos.y;
+      particleArray[pIdx + 2] = omt * omt * dishVec.z + 2 * omt * t * _control.z + t * t * _satPos.z;
     }
     particlePosAttr.needsUpdate = true;
     (particles.material as THREE.PointsMaterial).opacity = 0.7 * opacity;
@@ -610,7 +669,7 @@ export default function ConnectionBeam() {
       if (isISLRoute) {
         geoLatency = route.latencyMs; // already includes backhaul
       } else {
-        geoLatency = computeGeometricLatency(DISH_VEC, _satPos, gsVec);
+        geoLatency = computeGeometricLatency(dishVec, _satPos, gsVec);
         // Add backhaul for direct path
         if (lastGSIndex >= 0) geoLatency += GS_BACKHAUL_RTT_MS[lastGSIndex];
       }
