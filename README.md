@@ -11,7 +11,7 @@ Real-time 3D visualization of the Starlink satellite constellation, built with N
 ![Ground Stations](https://img.shields.io/badge/gateways-204-ff9933)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-https://github.com/juliensimon/starlink-viz/raw/master/docs/starlink-viz.mp4
+![Starlink Viz Demo](docs/starlink-viz.gif)
 
 ## What it does
 
