@@ -67,7 +67,7 @@ You can also toggle modes at runtime using the **Demo/Live** switch in the top-r
 
 ### 3D Globe
 
-The main view shows Earth with the full Starlink constellation (~7,500 tracked satellites) rendered in real-time using SGP4 orbital propagation from NORAD TLE data.
+The main view shows Earth with the full Starlink constellation (~10,000 tracked satellites) rendered in real-time using SGP4 orbital propagation from NORAD TLE data.
 
 **Mouse controls:**
 - **Drag** — Orbit the camera around the globe

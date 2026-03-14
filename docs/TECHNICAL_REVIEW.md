@@ -142,7 +142,7 @@ The app assumes the dish can electronically steer its beam within a **25° cone*
 
 **Implementation:** `src/lib/satellites/tle-fetcher.ts` — fetches from `celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle`, parsed by `src/app/api/tle/route.ts`. The client-side hook (`src/hooks/useSatellites.ts`) retries with exponential backoff (1s, 2s, 4s).
 
-The app fetches ~7,500 Starlink satellite TLEs. CelesTrak updates its data roughly twice daily from NORAD. The app tracks when TLEs were last fetched and displays TLE age in the status bar.
+The app fetches ~10,000 Starlink satellite TLEs. CelesTrak updates its data roughly twice daily from NORAD. The app tracks when TLEs were last fetched and displays TLE age in the status bar.
 
 **Gap:** TLEs don't tell you whether a satellite is operational, still raising its orbit to the right altitude, maneuvering, or being deorbited. The app uses **per-shell altitude bands** (defined in `src/lib/config.ts`) to estimate operational status based on whether a satellite is near its shell's target altitude.
 
@@ -255,7 +255,7 @@ Every Starlink dish runs a gRPC server that the official Starlink app uses for d
 
 ### 9. Satellite Count — Verified ✓
 
-The app renders ~7,500 satellites (up to 10,000 supported via instanced mesh in `src/components/scene/Satellites.tsx`), matching the current public NORAD catalog. The actual number of *operational* satellites is slightly lower — the catalog includes objects still raising orbit or being deorbited.
+The app renders ~10,000 satellites (instanced mesh in `src/components/scene/Satellites.tsx`), matching the current public NORAD catalog. The actual number of *operational* satellites is slightly lower — the catalog includes objects still raising orbit or being deorbited.
 
 **Reference:** [Jonathan McDowell's Starlink statistics](https://planet4589.org/space/con/star/stats.html) — the most comprehensive independent tracking of Starlink launches and operational status.
 
