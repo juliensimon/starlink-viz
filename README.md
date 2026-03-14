@@ -1,6 +1,6 @@
 # starlink-viz
 
-Real-time 3D Starlink satellite tracker and mission control dashboard. Track every satellite in the SpaceX Starlink constellation, monitor live dish telemetry, visualize ground stations, and watch satellite handoffs — all computed from publicly available data. Built with Next.js, React Three Fiber, and Three.js.
+Real-time 3D Starlink satellite tracker and mission control dashboard. Track every satellite in the SpaceX Starlink constellation, monitor live dish telemetry, visualize ground stations, watch satellite handoffs, and predict inter-satellite laser link (ISL) routing — all computed from publicly available data. Built with Next.js, React Three Fiber, and Three.js.
 
 ![CI](https://github.com/juliensimon/starlink-viz/actions/workflows/ci.yml/badge.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
@@ -22,8 +22,9 @@ Real-time 3D Starlink satellite tracker and mission control dashboard. Track eve
 - **Astronomically accurate Sun and Moon** with real-time positioning, lens flare, and natural lunar phases
 - **Satellite handoff tracking** — monitors when your dish switches between satellites
 - **204 ground stations** from FCC/international filings, with operational/planned status
-- **ISL routing prediction** — models inter-satellite laser links with PoP-constrained gateway selection, line-of-sight checks, and green ISL beam visualization
+- **ISL routing prediction** — models inter-satellite laser links with PoP-constrained gateway selection, line-of-sight checks, and per-gateway backhaul estimation. ISL routes activate when no ground station serving the user's PoP is directly visible from the serving satellite
 - **Connection beam** visualization from dish to connected satellite (cyan uplink, green ISL hops, orange downlink)
+- **Demo locations** — 5 remote locations (Iceland Gap, Atlantic, Gulf of Mexico, Celtic Sea) where ISL routing is mandatory, with automatic PoP assignment
 - **Day/night globe** with city lights on the dark side and atmospheric glow
 
 ## Quick start
