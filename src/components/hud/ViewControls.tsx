@@ -25,7 +25,10 @@ export default function ViewControls() {
         body: JSON.stringify({ mode: demoMode ? 'live' : 'demo' }),
       });
       const data = await res.json();
-      useAppStore.getState().setDemoMode(data.mode === 'demo');
+      const isDemo = data.mode === 'demo';
+      useAppStore.getState().setDemoMode(isDemo);
+      // Clear demo location when switching to live mode
+      if (!isDemo) setDemoLocation(null);
     } catch {
       // Will be reported via event log
     }

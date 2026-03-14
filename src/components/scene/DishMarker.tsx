@@ -7,11 +7,14 @@ import { DISH_POS } from '@/lib/utils/dish-frame';
 import { geodeticToCartesian } from '@/lib/utils/coordinates';
 import { useAppStore } from '@/stores/app-store';
 
+function degToRad(d: number): number {
+  return (d * Math.PI) / 180;
+}
+
 export function getDishPosition(): THREE.Vector3 {
   const demoLoc = useAppStore.getState().demoLocation;
   if (demoLoc) {
-    const rad = (d: number) => (d * Math.PI) / 180;
-    const p = geodeticToCartesian(rad(demoLoc.lat), rad(demoLoc.lon), 0, 1);
+    const p = geodeticToCartesian(degToRad(demoLoc.lat), degToRad(demoLoc.lon), 0, 1);
     return new THREE.Vector3(p.x, p.y, p.z);
   }
   return new THREE.Vector3(DISH_POS.x, DISH_POS.y, DISH_POS.z);
@@ -20,8 +23,12 @@ export function getDishPosition(): THREE.Vector3 {
 export default function DishMarker() {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Sprite>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
-  const position = useMemo(() => getDishPosition(), []);
+  // Subscribe to demo location changes so the marker moves
+  const demoLocation = useAppStore((s) => s.demoLocation);
+
+  const position = useMemo(() => getDishPosition(), [demoLocation]);
 
   const material = useMemo(
     () =>
@@ -66,7 +73,7 @@ export default function DishMarker() {
   });
 
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position}>
       <mesh ref={meshRef} material={material}>
         <sphereGeometry args={[0.006, 8, 8]} />
       </mesh>
