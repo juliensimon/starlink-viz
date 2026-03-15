@@ -449,7 +449,7 @@ export default function ConnectionBeam() {
     const now = performance.now();
     const appState = useAppStore.getState();
     const islEnabled = appState.islPrediction;
-    const demoLoc = appState.demoLocation;
+    const demoLoc = appState.demoMode ? appState.demoLocation : null;
 
     // Compute effective dish position — override for demo locations
     let dishVec: THREE.Vector3 = DISH_VEC;

@@ -66,12 +66,16 @@ export const useAppStore = create<AppState>((set) => ({
   altitudeFilter: true,
   hudVisible: true,
   islPrediction: true,
-  demoLocation: DEMO_LOCATIONS[0],  // Iceland Gap — best ISL demo location
+  demoLocation: null,
 
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
   setViewState: (state) => set({ viewState: state }),
-  setDemoMode: (enabled) => set({ demoMode: enabled }),
+  setDemoMode: (enabled) => set({
+    demoMode: enabled,
+    // Set Iceland Gap when entering demo, clear when leaving
+    demoLocation: enabled ? DEMO_LOCATIONS[0] : null,
+  }),
   setSatellitesLoaded: (loaded) => set({ satellitesLoaded: loaded }),
   setAutoRotate: (enabled) => set({ autoRotate: enabled }),
   focusDish: () => set((s) => ({ focusDishRequested: s.focusDishRequested + 1 })),
