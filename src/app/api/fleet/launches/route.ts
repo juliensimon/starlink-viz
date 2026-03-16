@@ -4,7 +4,7 @@ import { queryLaunches } from '@/lib/fleet/queries';
 
 export async function GET(request: NextRequest) {
   try {
-    await initDatabase();
+    initDatabase();
     const searchParams = request.nextUrl.searchParams;
     const from = searchParams.get('from') || undefined;
     const to = searchParams.get('to') || undefined;

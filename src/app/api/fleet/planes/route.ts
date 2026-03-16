@@ -4,7 +4,7 @@ import { queryPlanes } from '@/lib/fleet/queries';
 
 export async function GET(request: NextRequest) {
   try {
-    await initDatabase();
+    initDatabase();
     const shell = request.nextUrl.searchParams.get('shell') || '2';
     const data = await queryPlanes(parseInt(shell));
     return Response.json(data);
