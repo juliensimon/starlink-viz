@@ -82,9 +82,8 @@ describe('demo location management', () => {
 
   it('all demo location PoPs exist in POP_LOCATIONS', async () => {
     // Import dynamically to avoid circular deps in test
-    const { default: pathfinderModule } = await import('../lib/utils/isl-pathfinder');
-    // POP_LOCATIONS is internal, so we verify indirectly: each PoP name
-    // must match a key used by the pathfinder. We check the known set.
+    // POP_LOCATIONS is internal to isl-pathfinder, so we verify indirectly:
+    // each PoP name must match a key in the known set.
     const knownPops = [
       'Frankfurt, DE', 'London, GB', 'Madrid, ES', 'Los Angeles, US',
       'Seattle, US', 'Chicago, US', 'Washington DC, US', 'Miami, US',
