@@ -3,7 +3,7 @@ import { queryShells, getRecordCount, getLastIngestDate } from '@/lib/fleet/quer
 
 export async function GET() {
   try {
-    await initDatabase();
+    initDatabase();
     const [shells, recordCount, lastIngest] = await Promise.all([
       queryShells(),
       getRecordCount(),

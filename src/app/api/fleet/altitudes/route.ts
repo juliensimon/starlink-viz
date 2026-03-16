@@ -4,7 +4,7 @@ import { queryAltitudes } from '@/lib/fleet/queries';
 
 export async function GET(request: NextRequest) {
   try {
-    await initDatabase();
+    initDatabase();
     const date = request.nextUrl.searchParams.get('date') || undefined;
     const data = await queryAltitudes(date);
     return Response.json(data);

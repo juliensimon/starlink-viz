@@ -1,9 +1,14 @@
 'use client';
 
 import React from 'react';
-import type { TooltipProps } from 'recharts';
 
-export function FleetTooltip({ active, payload, label }: TooltipProps<number, string>) {
+interface FleetTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
+  label?: string;
+}
+
+export function FleetTooltip({ active, payload, label }: FleetTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
