@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 
 let db: Database.Database | null = null;
 
-export function initDatabase(path: string): Database.Database {
+export function initDatabase(path: string = 'data/fleet.db'): Database.Database {
   db = new Database(path);
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 5000');

@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ noradId: string }> }
 ) {
   try {
-    await initDatabase();
+    initDatabase();
     const { noradId } = await params;
     const data = await querySatelliteHistory(parseInt(noradId));
     return Response.json(data);

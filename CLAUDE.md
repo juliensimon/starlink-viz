@@ -74,6 +74,19 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 
 204 gateways (168 operational, 36 planned) sourced from FCC IBFS, Starlink Insider, and international regulatory filings. Planned stations are rendered with reduced opacity and **excluded from gateway selection routing** in `ConnectionBeam.tsx`. Fallback data is embedded in `src/lib/satellites/ground-stations.ts`.
 
+### Fleet Monitor (`/fleet`)
+
+Separate page tracking Starlink constellation health over time using NORAD TLE data.
+
+- **Database**: `data/fleet.db` (SQLite, gitignored) — `tle_snapshots` (per-satellite per-epoch) and `daily_snapshots` (materialized daily aggregates per shell)
+- **Ingestion**: `npm run ingest` fetches from CelesTrak, propagates via SGP4, classifies status, persists to SQLite
+- **Status classification** (`src/lib/fleet/classify.ts`) — sliding window of 3+ TLE epochs: `operational`, `raising`, `deorbiting`, `decayed`, `anomalous`, `unknown`
+- **API routes**: `/api/fleet/{growth,shells,altitudes,launches,satellite/[noradId],planes}`
+- **Charts** (`src/components/fleet/`) — 7 recharts panels: Constellation Growth, Altitude Distribution, Shell Fill Rate, Launch Cadence, Satellite Lifecycle, Orbital Planes (RAAN with J2 correction), ISL Coverage
+- **RAAN correction** (`src/lib/fleet/raan-correction.ts`) — J2 precession correction to common reference epoch for orbital plane analysis
+- **Shell targets** (`SHELL_TARGETS` in `config.ts`) — FCC-authorized constellation sizes per shell
+- **Filtering**: Only `STARLINK-\d+` names ingested (rejects Starshield, debris, TBA objects)
+
 ### Key Conventions
 
 - Path alias: `@/` maps to `src/`
