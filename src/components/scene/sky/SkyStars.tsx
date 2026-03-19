@@ -12,7 +12,7 @@ import { DISH_LAT_DEG, DISH_LON_DEG } from '@/lib/config';
 
 const DOME_RADIUS = 2.0;
 const STAR_UPDATE_INTERVAL_MS = 10000; // 10s — sidereal rotation is slow
-const NAMED_MAG_LIMIT = 2.0; // only label stars brighter than this
+const NAMED_MAG_LIMIT = 2.5; // only label stars brighter than this
 
 /** Map B-V color index to an approximate RGB color */
 function bvToColor(bv: number): THREE.Color {
