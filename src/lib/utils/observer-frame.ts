@@ -18,12 +18,19 @@ export function computeObserverFrame(latDeg: number, lonDeg: number): ObserverFr
 
   // East = cross(Y_up, normal), normalized
   // Y_up = (0, 1, 0)
-  const rawEast = {
+  // At the poles, normal aligns with Y_up and the cross product degenerates.
+  // Fall back to X-axis as east at the north pole, -X at the south pole.
+  let rawEast = {
     x: 1 * normal.z - 0,
     y: 0,
     z: 0 - 1 * normal.x,
   };
-  const eLen = Math.sqrt(rawEast.x * rawEast.x + rawEast.y * rawEast.y + rawEast.z * rawEast.z);
+  let eLen = Math.sqrt(rawEast.x * rawEast.x + rawEast.y * rawEast.y + rawEast.z * rawEast.z);
+  if (eLen < 1e-10) {
+    // Pole: use X-axis as east (north pole) or -X (south pole)
+    rawEast = { x: normal.y > 0 ? 1 : -1, y: 0, z: 0 };
+    eLen = 1;
+  }
   const east = { x: rawEast.x / eLen, y: rawEast.y / eLen, z: rawEast.z / eLen };
 
   // North = cross(normal, east)

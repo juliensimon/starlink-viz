@@ -54,7 +54,7 @@ export const BRIGHT_STARS: BrightStar[] = [
   { name: 'Kochab',       ra: 240.083, dec:  77.795, mag:  2.08, bv: 1.47 },
   { name: 'Alnair',       ra: 340.667, dec: -46.885, mag:  1.74, bv: 1.60 },
   { name: 'Menkalinan',   ra:  75.492, dec:  43.823, mag:  1.90, bv: 0.03 },
-  { name: 'Mirach',       ra:   8.274, dec:  15.184, mag:  2.06, bv: 1.58 },
+  { name: 'Mirach',       ra:  17.433, dec:  35.621, mag:  2.06, bv: 1.58 },
   { name: 'Saiph',        ra:  87.740, dec:  -9.670, mag:  2.09, bv: -0.18 },
 
   // ══════════════════════════════════════════════════════════════
@@ -121,7 +121,7 @@ export const BRIGHT_STARS: BrightStar[] = [
   { name: '',  ra:  17.433, dec:  35.621, mag: 2.83, bv: 0.59 },   // γ And (Almach)
   { name: '',  ra:  14.177, dec:  60.717, mag: 2.68, bv: 0.34 },   // γ Cas
   { name: '',  ra:  10.897, dec:  56.537, mag: 2.27, bv: -0.15 },  // Schedar (α Cas)
-  { name: '',  ra:   9.243, dec:  59.150, mag: 2.47, bv: 0.13 },   // Caph (β Cas)
+  { name: '',  ra:   2.295, dec:  59.150, mag: 2.47, bv: 0.13 },   // Caph (β Cas)
   { name: '',  ra: 346.190, dec: -43.520, mag: 2.39, bv: -0.16 },  // δ1 Gru
   { name: '',  ra: 340.364, dec: -46.961, mag: 2.10, bv: -0.13 },  // β Gru
   { name: '',  ra: 332.058, dec:  -0.320, mag: 2.90, bv: 0.98 },   // ε Aqr
