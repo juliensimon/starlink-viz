@@ -6,6 +6,7 @@ const TEST_TLE = {
   name: 'STARLINK-1007',
   line1: '1 44713U 19074A   24001.50000000  .00001000  00000-0  10000-3 0  9991',
   line2: '2 44713  53.0544 200.0000 0001500  90.0000 270.0000 15.05000000 10001',
+  inclination: 53.0544,
 };
 
 describe('propagatePosition', () => {
@@ -57,6 +58,7 @@ describe('propagatePosition', () => {
       name: 'BAD',
       line1: 'garbage line 1',
       line2: 'garbage line 2',
+      inclination: 0,
     };
     const [satrec] = initSatelliteRecords([badTle]);
     const pos = propagatePosition(satrec, new Date());
