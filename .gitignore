@@ -42,8 +42,9 @@ yarn-error.log*
 # superpowers
 .superpowers/
 
-# screenshots
+# screenshots (except docs/)
 *.png
+!docs/*.png
 
 # typescript
 *.tsbuildinfo
