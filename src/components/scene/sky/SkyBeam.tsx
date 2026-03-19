@@ -102,24 +102,6 @@ export default function SkyBeam() {
     return s;
   }, [haloMat]);
 
-  // Thin core line for definition
-  const { line, linePos } = useMemo(() => {
-    const positions = new Float32Array(2 * 3);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const mat = new THREE.LineBasicMaterial({
-      color: '#00ddff',
-      transparent: true,
-      opacity: 0.3,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const l = new THREE.Line(geo, mat);
-    l.frustumCulled = false;
-    l.visible = false;
-    return { line: l, linePos: geo.getAttribute('position') as THREE.BufferAttribute };
-  }, []);
-
   useFrame(({ clock }) => {
     const connIdx = useAppStore.getState().connectedSatelliteIndex;
     const positions = getPositionsArray();
@@ -127,7 +109,6 @@ export default function SkyBeam() {
     if (connIdx === null || !positions) {
       sprites.forEach(s => s.visible = false);
       halo.visible = false;
-      line.visible = false;
       return;
     }
 
@@ -136,7 +117,6 @@ export default function SkyBeam() {
     if (x === 0 && y === 0 && z === 0) {
       sprites.forEach(s => s.visible = false);
       halo.visible = false;
-      line.visible = false;
       return;
     }
 
@@ -144,7 +124,6 @@ export default function SkyBeam() {
     if (el < 0) {
       sprites.forEach(s => s.visible = false);
       halo.visible = false;
-      line.visible = false;
       return;
     }
 
@@ -183,23 +162,12 @@ export default function SkyBeam() {
     halo.scale.setScalar(haloScale);
     halo.visible = true;
 
-    // Core line
-    const lp = linePos.array as Float32Array;
-    lp[0] = frame.pos.x + dir.x * 0.01;
-    lp[1] = frame.pos.y + dir.y * 0.01;
-    lp[2] = frame.pos.z + dir.z * 0.01;
-    lp[3] = satPos.x;
-    lp[4] = satPos.y;
-    lp[5] = satPos.z;
-    linePos.needsUpdate = true;
-    line.visible = true;
   });
 
   return (
     <group ref={groupRef}>
       {sprites.map((s, i) => <primitive key={i} object={s} />)}
       <primitive object={halo} />
-      <primitive object={line} />
     </group>
   );
 }
