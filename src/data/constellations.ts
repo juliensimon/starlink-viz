@@ -17,9 +17,9 @@ export const CONSTELLATIONS: Constellation[] = [
   {
     abbr: 'And', name: 'Andromeda', ra: 8.0, dec: 38.0,
     lines: [
-      [2.097, 29.091, 8.274, 15.184],    // Alpheratz -> Mirach (δ And -> β And)
-      [8.274, 15.184, 17.433, 35.621],    // Mirach -> Almach (β And -> γ And)
-      [8.274, 15.184, 13.529, 15.346],    // Mirach -> δ And
+      [2.097, 29.091, 17.433, 35.621],    // Alpheratz -> Mirach (α And -> β And)
+      [17.433, 35.621, 30.975, 42.330],   // Mirach -> Almach (β And -> γ And)
+      [17.433, 35.621, 13.529, 42.330],   // Mirach -> δ And
     ],
   },
   // ── Antlia ──
@@ -193,7 +193,7 @@ export const CONSTELLATIONS: Constellation[] = [
   {
     abbr: 'Cas', name: 'Cassiopeia', ra: 15.0, dec: 60.0,
     lines: [
-      [9.243, 59.150, 10.897, 56.537],      // Caph (β) -> Schedar (α)
+      [2.295, 59.150, 10.897, 56.537],      // Caph (β) -> Schedar (α)
       [10.897, 56.537, 14.177, 60.717],     // Schedar -> γ Cas
       [14.177, 60.717, 21.454, 60.235],     // γ Cas -> δ Cas (Ruchbah)
       [21.454, 60.235, 28.599, 63.670],     // δ Cas -> ε Cas

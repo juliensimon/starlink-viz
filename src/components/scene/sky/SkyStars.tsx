@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo, useCallback } from 'react';
+import { useRef, useMemo, useCallback, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Billboard, Text } from '@react-three/drei';
@@ -29,6 +29,7 @@ export default function SkyStars() {
   const pointsRef = useRef<THREE.Points>(null);
   const lastUpdateRef = useRef(0);
   const labelsRef = useRef<Array<{ name: string; position: THREE.Vector3 }>>([]);
+  const [, setLabelTick] = useState(0); // triggers re-render when labels update
 
   const demoLocation = useAppStore((s) => s.demoLocation);
   const lat = demoLocation?.lat ?? DISH_LAT_DEG;
@@ -127,6 +128,7 @@ export default function SkyStars() {
 
     posAttr.needsUpdate = true;
     labelsRef.current = newLabels;
+    setLabelTick((t) => t + 1); // trigger re-render for label JSX
   }, [geometry, frame, lat, lon, starCount]);
 
   // Initial position computation

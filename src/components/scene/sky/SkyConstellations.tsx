@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo, useCallback } from 'react';
+import { useRef, useMemo, useCallback, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Billboard, Text } from '@react-three/drei';
@@ -34,6 +34,7 @@ export default function SkyConstellations() {
   const linesRef = useRef<THREE.LineSegments>(null);
   const lastUpdateRef = useRef(0);
   const labelsRef = useRef<Array<{ abbr: string; name: string; position: THREE.Vector3 }>>([]);
+  const [, setLabelTick] = useState(0);
 
   const demoLocation = useAppStore((s) => s.demoLocation);
   const lat = demoLocation?.lat ?? DISH_LAT_DEG;
@@ -113,6 +114,7 @@ export default function SkyConstellations() {
 
     posAttr.needsUpdate = true;
     labelsRef.current = newLabels;
+    setLabelTick((t) => t + 1);
   }, [geometry, frame, lat, lon]);
 
   // Initial computation

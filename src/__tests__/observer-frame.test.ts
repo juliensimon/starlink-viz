@@ -39,6 +39,23 @@ describe('computeObserverFrame', () => {
     // For a point at 45°N, north direction should have a significant Y component
     expect(frame.north.y).toBeGreaterThan(0);
   });
+
+  it('handles north pole without NaN (pole degeneracy guard)', () => {
+    const frame = computeObserverFrame(90, 0);
+    expect(isNaN(frame.east.x)).toBe(false);
+    expect(isNaN(frame.east.y)).toBe(false);
+    expect(isNaN(frame.east.z)).toBe(false);
+    expect(isNaN(frame.north.x)).toBe(false);
+    // Vectors should still be unit length
+    const eLen = Math.sqrt(frame.east.x ** 2 + frame.east.y ** 2 + frame.east.z ** 2);
+    expect(eLen).toBeCloseTo(1, 5);
+  });
+
+  it('handles south pole without NaN', () => {
+    const frame = computeObserverFrame(-90, 0);
+    expect(isNaN(frame.east.x)).toBe(false);
+    expect(isNaN(frame.north.x)).toBe(false);
+  });
 });
 
 describe('computeAzElFrom', () => {
