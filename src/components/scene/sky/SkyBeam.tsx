@@ -9,104 +9,197 @@ import { computeObserverFrame, computeAzElFrom, azElToDirection3D } from '@/lib/
 import { DISH_LAT_DEG, DISH_LON_DEG } from '@/lib/config';
 
 const DOME_RADIUS = 2.0;
-const BEAM_SEGMENTS = 20;
+
+/** Create a soft radial gradient texture for the glow sprite */
+function makeGlowTexture(): THREE.Texture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(0, 255, 255, 1.0)');
+  gradient.addColorStop(0.15, 'rgba(0, 255, 255, 0.6)');
+  gradient.addColorStop(0.4, 'rgba(0, 200, 255, 0.15)');
+  gradient.addColorStop(1, 'rgba(0, 100, 200, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+
+/** Create a ring texture for the halo */
+function makeHaloTexture(): THREE.Texture {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const cx = size / 2, cy = size / 2;
+
+  // Outer glow ring
+  const gradient = ctx.createRadialGradient(cx, cy, size * 0.25, cx, cy, size * 0.5);
+  gradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
+  gradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.4)');
+  gradient.addColorStop(0.7, 'rgba(0, 220, 255, 0.6)');
+  gradient.addColorStop(0.85, 'rgba(0, 200, 255, 0.2)');
+  gradient.addColorStop(1, 'rgba(0, 150, 200, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+const BEAM_SPRITES = 8; // sprites along the beam
 
 /**
- * Draws a beam from the observer toward the connected satellite in sky view.
- * Cyan beam with additive blending, fading from bright at observer to dim at satellite.
+ * Glowing beam from observer toward connected satellite.
+ * Uses billboard sprites for a soft volumetric look, plus a halo ring at the satellite.
  */
 export default function SkyBeam() {
+  const groupRef = useRef<THREE.Group>(null);
   const demoLocation = useAppStore((s) => s.demoLocation);
   const lat = demoLocation?.lat ?? DISH_LAT_DEG;
   const lon = demoLocation?.lon ?? DISH_LON_DEG;
   const frame = useMemo(() => computeObserverFrame(lat, lon), [lat, lon]);
 
-  const { line, posAttr, colorAttr } = useMemo(() => {
-    const positions = new Float32Array(BEAM_SEGMENTS * 3);
-    const colors = new Float32Array(BEAM_SEGMENTS * 3);
+  // Beam sprites — soft glow dots along the beam direction
+  const glowMat = useMemo(() => {
+    const tex = makeGlowTexture();
+    return new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.5,
+    });
+  }, []);
+
+  // Halo sprite at the satellite
+  const haloMat = useMemo(() => {
+    const tex = makeHaloTexture();
+    return new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.7,
+    });
+  }, []);
+
+  const sprites = useMemo(() => {
+    const arr: THREE.Sprite[] = [];
+    for (let i = 0; i < BEAM_SPRITES; i++) {
+      const s = new THREE.Sprite(glowMat);
+      s.visible = false;
+      arr.push(s);
+    }
+    return arr;
+  }, [glowMat]);
+
+  const halo = useMemo(() => {
+    const s = new THREE.Sprite(haloMat);
+    s.visible = false;
+    return s;
+  }, [haloMat]);
+
+  // Thin core line for definition
+  const { line, linePos } = useMemo(() => {
+    const positions = new Float32Array(2 * 3);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const mat = new THREE.ShaderMaterial({
-      vertexShader: /* glsl */ `
-        attribute vec3 color;
-        varying vec3 vColor;
-        void main() {
-          vColor = color;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        varying vec3 vColor;
-        void main() {
-          float brightness = max(vColor.r, max(vColor.g, vColor.b));
-          gl_FragColor = vec4(vColor, brightness * 0.7);
-        }
-      `,
+    const mat = new THREE.LineBasicMaterial({
+      color: '#00ddff',
       transparent: true,
+      opacity: 0.3,
       depthWrite: false,
-      toneMapped: false,
       blending: THREE.AdditiveBlending,
     });
-
     const l = new THREE.Line(geo, mat);
     l.frustumCulled = false;
     l.visible = false;
-
-    return {
-      line: l,
-      posAttr: geo.getAttribute('position') as THREE.BufferAttribute,
-      colorAttr: geo.getAttribute('color') as THREE.BufferAttribute,
-    };
+    return { line: l, linePos: geo.getAttribute('position') as THREE.BufferAttribute };
   }, []);
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     const connIdx = useAppStore.getState().connectedSatelliteIndex;
     const positions = getPositionsArray();
 
     if (connIdx === null || !positions) {
-      if (line.visible) line.visible = false;
+      sprites.forEach(s => s.visible = false);
+      halo.visible = false;
+      line.visible = false;
       return;
     }
 
     const pi = connIdx * 3;
     const x = positions[pi], y = positions[pi + 1], z = positions[pi + 2];
     if (x === 0 && y === 0 && z === 0) {
+      sprites.forEach(s => s.visible = false);
+      halo.visible = false;
       line.visible = false;
       return;
     }
 
     const { az, el } = computeAzElFrom(frame, x, y, z);
     if (el < 0) {
+      sprites.forEach(s => s.visible = false);
+      halo.visible = false;
       line.visible = false;
       return;
     }
 
-    const pos = posAttr.array as Float32Array;
-    const col = colorAttr.array as Float32Array;
-
-    // Draw beam from observer to satellite dome position
     const dir = azElToDirection3D(frame, az, el);
-    for (let i = 0; i < BEAM_SEGMENTS; i++) {
-      const t = i / (BEAM_SEGMENTS - 1);
+    const time = clock.elapsedTime;
+
+    // Place glow sprites along beam
+    for (let i = 0; i < BEAM_SPRITES; i++) {
+      const t = (i + 1) / (BEAM_SPRITES + 1); // 0 excluded (observer), 1 excluded (sat)
       const r = t * DOME_RADIUS;
+      const sprite = sprites[i];
 
-      pos[i * 3]     = frame.pos.x + dir.x * r;
-      pos[i * 3 + 1] = frame.pos.y + dir.y * r;
-      pos[i * 3 + 2] = frame.pos.z + dir.z * r;
+      sprite.position.set(
+        frame.pos.x + dir.x * r,
+        frame.pos.y + dir.y * r,
+        frame.pos.z + dir.z * r
+      );
 
-      // Gradient: bright cyan at base, fading out toward satellite
-      const intensity = (1 - t * 0.7) * 0.6;
-      col[i * 3]     = 0.0 * intensity;
-      col[i * 3 + 1] = 1.0 * intensity;
-      col[i * 3 + 2] = 1.0 * intensity;
+      // Size: larger near satellite, subtle pulse
+      const baseSize = 0.03 + t * 0.04;
+      const pulse = 1 + 0.15 * Math.sin(time * 2 + t * 5);
+      const fade = 0.3 + 0.7 * (1 - Math.abs(t - 0.5) * 2); // brightest in middle
+      sprite.scale.setScalar(baseSize * pulse);
+      sprite.material.opacity = fade * 0.35;
+      sprite.visible = true;
     }
 
-    posAttr.needsUpdate = true;
-    colorAttr.needsUpdate = true;
+    // Halo at satellite position
+    const satPos = {
+      x: frame.pos.x + dir.x * DOME_RADIUS,
+      y: frame.pos.y + dir.y * DOME_RADIUS,
+      z: frame.pos.z + dir.z * DOME_RADIUS,
+    };
+    halo.position.set(satPos.x, satPos.y, satPos.z);
+    const haloScale = 0.12 + 0.02 * Math.sin(time * 3);
+    halo.scale.setScalar(haloScale);
+    halo.visible = true;
+
+    // Core line
+    const lp = linePos.array as Float32Array;
+    lp[0] = frame.pos.x + dir.x * 0.01;
+    lp[1] = frame.pos.y + dir.y * 0.01;
+    lp[2] = frame.pos.z + dir.z * 0.01;
+    lp[3] = satPos.x;
+    lp[4] = satPos.y;
+    lp[5] = satPos.z;
+    linePos.needsUpdate = true;
     line.visible = true;
   });
 
-  return <primitive object={line} />;
+  return (
+    <group ref={groupRef}>
+      {sprites.map((s, i) => <primitive key={i} object={s} />)}
+      <primitive object={halo} />
+      <primitive object={line} />
+    </group>
+  );
 }
