@@ -8,6 +8,7 @@ import SkySatellites from './sky/SkySatellites';
 import SkyStars from './sky/SkyStars';
 import SkyTooltip from './sky/SkyTooltip';
 import SkyTrajectory from './sky/SkyTrajectory';
+import SkyBeam from './sky/SkyBeam';
 
 export default function SkyView() {
   return (
@@ -18,6 +19,7 @@ export default function SkyView() {
       <SkyConstellations />
       <SkySatellites />
       <SkyStars />
+      <SkyBeam />
       <SkyTooltip />
       <SkyTrajectory />
     </group>

@@ -77,11 +77,14 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
   setViewState: (state) => set({ viewState: state }),
-  setDemoMode: (enabled) => set({
+  setDemoMode: (enabled) => set((s) => ({
     demoMode: enabled,
-    // Set Iceland Gap when entering demo, clear when leaving
-    demoLocation: enabled ? DEMO_LOCATIONS[0] : null,
-  }),
+    // Set Iceland Gap only when first entering demo, clear when leaving.
+    // Don't reset if already in demo (preserves user's location choice).
+    demoLocation: enabled
+      ? (s.demoMode ? s.demoLocation : DEMO_LOCATIONS[0])
+      : null,
+  })),
   setSatellitesLoaded: (loaded) => set({ satellitesLoaded: loaded }),
   bumpSatellitesVersion: () => set((s) => ({ satellitesVersion: s.satellitesVersion + 1 })),
   setAutoRotate: (enabled) => set({ autoRotate: enabled }),
