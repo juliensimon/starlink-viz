@@ -28,13 +28,27 @@ Custom HTTP server wrapping Next.js that handles:
 
 Single-page app with a full-viewport 3D canvas and HUD overlay:
 
-- **3D Scene** (`src/components/scene/`) — React Three Fiber canvas with Globe, Satellites (instanced mesh), GpsSatellites, Sun, Moon, DishMarker, ConnectionBeam, GroundStations (star-shaped markers, operational/planned), Atmosphere, and SceneSetup (camera controls, starfield)
+- **3D Scene** (`src/components/scene/`) — React Three Fiber canvas with two view modes:
+  - `SatellitePropagator` — headless SGP4 propagation, always mounted, writes positions to shared Float32Array in satellite-store
+  - `ConnectionBeam` — always mounted (drives satellite selection, handovers, az/el updates); visuals hidden in sky mode via `<group visible={false}>`
+  - **Space view**: Globe, Satellites (instanced mesh renderer, reads from satellite-store), GpsSatellites, Sun, Moon, DishMarker, GroundStations, Atmosphere, SceneSetup, SatelliteTooltip
+  - **Sky view** (`SkyView.tsx` → `src/components/scene/sky/`):
+    - `SkyDomeCamera` — Stellarium-style horizon camera, OrbitControls with 360° azimuth and zenith reach
+    - `SkyEnvironment` — ground plane, sun-aware sky gradient (day/twilight/night), horizon ring with compass ticks
+    - `SkyGrid` — elevation circles at 30°/60°, azimuth lines every 45°, Billboard cardinal labels
+    - `SkyConstellations` — 88 IAU constellation stick figures (LineSegments) + Billboard name labels, RA/Dec→Az/El
+    - `SkySatellites` — instanced mesh with az/el dome projection, sun shadow coloring (sunlit=bright, shadow=10%)
+    - `SkyStars` — ~500 reference stars (Points with shader), RA/Dec→Az/El via GMST, Billboard name labels
+    - `SkyBeam` — glow sprites + halo ring on connected satellite, follows handovers
+    - `SkyTooltip` — screen-space nearest-neighbor picking for satellites (az/el, shell, sunlit) and stars (name, magnitude)
+    - `SkyTrajectory` — ±5min trajectory arc on hover via SGP4 `propagatePosition()`
 - **HUD** (`src/components/hud/`):
   - `StatusBar` — connection state, uptime, quality, firmware, GPS
   - `TelemetryPanel` — sparkline charts for ping, DL, UL, SNR
   - `SatelliteInfoPanel` — satellite link info, gateway, PoP, route type (Direct/ISL), latency confidence indicator
   - `HandoffPanel` — titled "Starlink Network": LIVE/TLE/WS indicators, per-shell satellite stats (operational/total/%), gateway counts, handoff tracking
-  - `EventLog`, `ViewControls`, `ColorLegend`
+  - `SkyHud` — sky view stats: sun elevation, satellite counts (sunlit/shadow), UTC time, daytime warning
+  - `EventLog`, `ViewControls` (Space/Sky toggle, demo/live, rotate, altitude filter, ISL), `ColorLegend`
 - **WebSocket client** (`src/components/WebSocketManager.tsx`) — receives messages and dispatches to stores
 
 ### State Management
@@ -44,12 +58,13 @@ Single-page app with a full-viewport 3D canvas and HUD overlay:
 
 ### Satellite Propagation
 
-- `src/lib/satellites/propagator.ts` — SGP4 orbital propagation using `satellite.js`, writes positions into Float32Array for instanced rendering
+- `src/lib/satellites/propagator.ts` — SGP4 orbital propagation using `satellite.js`, writes positions into Float32Array for instanced rendering. Includes `propagatePosition()` for single-satellite 3D position queries (used by trajectory arcs)
 - `src/lib/satellites/tle-fetcher.ts` — fetches TLE data via API routes
 - `src/lib/satellites/satellite-store.ts` — manages satellite records, position buffers, full unfiltered catalog (inclinations, altitudes, launch years), RAAN/ISL arrays, current route
 - `src/lib/satellites/isl-capability.ts` — ISL detection heuristic (launch year + inclination) and RAAN parsing from TLE
 - `src/lib/satellites/isl-graph.ts` — CSR-encoded neighbor graph for ISL-capable satellites (4 terminals: 2 in-plane, 2 cross-plane), rebuilt every 30s
-- `src/hooks/useSatellites.ts` — React hook driving propagation on animation frames
+- `src/hooks/useSatellites.ts` — React hook for TLE fetching
+- `src/components/scene/SatellitePropagator.tsx` — headless component that owns propagation loop; always mounted regardless of camera mode; both Space and Sky views read from the shared positionsArray
 
 ### Per-Shell Altitude Bands (`src/lib/config.ts`)
 
@@ -74,12 +89,22 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 
 204 gateways (168 operational, 36 planned) sourced from FCC IBFS, Starlink Insider, and international regulatory filings. Planned stations are rendered with reduced opacity and **excluded from gateway selection routing** in `ConnectionBeam.tsx`. Fallback data is embedded in `src/lib/satellites/ground-stations.ts`.
 
+### Sky View Utilities
+
+- `src/lib/utils/observer-frame.ts` — parameterized ENU (East-North-Up) frame from lat/lon, with `computeAzElFrom()` and `azElToDirection3D()`. Handles pole degeneracy with X-axis fallback
+- `src/lib/utils/sun-shadow.ts` — cylindrical Earth shadow model: `isSatelliteSunlit()` and `isSunBelowHorizon()` for observer darkness detection
+- `src/lib/utils/star-coordinates.ts` — RA/Dec (J2000) to Az/El horizontal coordinate transform using GMST from `satellite.gstime()`
+- `src/lib/utils/shell-colors.ts` — shared `getDimColor()` extracted from Satellites.tsx, used by both Space and Sky view renderers
+- `src/data/bright-stars.ts` — embedded catalog of ~500 stars (mag ≤ 4.0) with J2000 RA/Dec, magnitude, B-V color index
+- `src/data/constellations.ts` — 88 IAU constellation stick figures with line segment coordinates and label positions
+
 ### Key Conventions
 
 - Path alias: `@/` maps to `src/`
 - The 3D scene uses a unit sphere for Earth (radius = 1); satellite altitude is mapped as `1 + altKm / 6371`
 - Coordinate system: X = cos(lat)cos(lon), Y = sin(lat), Z = -cos(lat)sin(lon)
-- 5 orbital shells color-coded by inclination: 33° (gold), 43° (orange), 53° (blue), 70° (teal), 97.6° (pink-red). Classification in `getDimColor()` in `Satellites.tsx` must stay in sync with `shellIndex()` in `HandoffPanel.tsx` and `SHELL_ALT_BANDS` in `config.ts`
+- 5 orbital shells color-coded by inclination: 33° (gold), 43° (orange), 53° (blue), 70° (teal), 97.6° (pink-red). Classification in `getDimColor()` in `src/lib/utils/shell-colors.ts` must stay in sync with `shellIndex()` in `HandoffPanel.tsx` and `SHELL_ALT_BANDS` in `config.ts`
+- Camera mode toggled via `cameraMode` ('space' | 'sky') in app-store. Space/Sky toggle in ViewControls. `SatellitePropagator` and `ConnectionBeam` always mounted; visual components conditionally rendered
 - WebSocket protocol uses typed messages (`status`, `history`, `handoff`, `event`) defined in `src/lib/grpc/types.ts` with type guards in `src/lib/websocket/protocol.ts`
 - Dish location configured via `NEXT_PUBLIC_DISH_LAT` and `NEXT_PUBLIC_DISH_LON` env vars (defaults to 48.910, 1.910)
 - Scene is dynamically imported with SSR disabled (`next/dynamic`)
