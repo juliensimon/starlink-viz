@@ -28,6 +28,11 @@ export default function Scene() {
       scene={{ background: new THREE.Color('#0a0e1a') }}
     >
       <SatellitePropagator />
+      {/* ConnectionBeam always mounted — drives satellite selection, handovers,
+          az/el updates. Its visuals are hidden in sky mode via the group. */}
+      <group visible={cameraMode === 'space'}>
+        <ConnectionBeam />
+      </group>
       {cameraMode === 'space' ? (
         <>
           <Globe />
@@ -38,7 +43,6 @@ export default function Scene() {
           <GpsSatellites />
           <DishMarker />
           <GroundStations />
-          <ConnectionBeam />
           <SatelliteTooltip />
           <SceneSetup />
         </>
