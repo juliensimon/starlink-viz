@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '@/stores/app-store';
@@ -85,6 +85,16 @@ export default function SkyBeam() {
       opacity: 0.7,
     });
   }, []);
+
+  // Dispose GPU resources on unmount
+  useEffect(() => {
+    return () => {
+      glowMat.map?.dispose();
+      glowMat.dispose();
+      haloMat.map?.dispose();
+      haloMat.dispose();
+    };
+  }, [glowMat, haloMat]);
 
   const sprites = useMemo(() => {
     const arr: THREE.Sprite[] = [];
