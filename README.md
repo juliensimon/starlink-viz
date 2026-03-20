@@ -1,3 +1,13 @@
+---
+title: Starlink Mission Control
+emoji: 🛰
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # starlink-viz
 
 Real-time 3D Starlink satellite tracker and mission control dashboard. Track every satellite in the SpaceX Starlink constellation, monitor live dish telemetry, visualize ground stations, watch satellite handoffs, and predict inter-satellite laser link (ISL) routing — all computed from publicly available data. Includes a Stellarium-style night sky view with constellations and sun illumination modeling. Built with Next.js, React Three Fiber, and Three.js.
