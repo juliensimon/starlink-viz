@@ -58,6 +58,24 @@ export default function Home() {
 
   return (
     <main style={{ width: '100vw', height: '100vh' }}>
+      {process.env.NEXT_PUBLIC_HF_SPACE && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 60,
+          background: 'rgba(10, 14, 26, 0.85)', backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid rgba(0, 255, 255, 0.15)',
+          padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '8px', fontFamily: 'monospace', fontSize: '12px', color: 'rgba(255,255,255,0.7)',
+        }}>
+          <span style={{ color: 'var(--color-accent, #00ffff)' }}>Starlink Mission Control</span>
+          <span style={{ opacity: 0.4 }}>—</span>
+          <span>Real-time 3D satellite tracker with SGP4 propagation, ISL routing, and live dish telemetry</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <a href="https://github.com/juliensimon/starlink-viz" target="_blank" rel="noopener noreferrer"
+            style={{ color: 'var(--color-accent, #00ffff)', textDecoration: 'none' }}>
+            GitHub ↗
+          </a>
+        </div>
+      )}
       <WebSocketManager />
       <SceneErrorBoundary>
         <Scene />
