@@ -42,6 +42,9 @@ yarn-error.log*
 # superpowers
 .superpowers/
 
+# worktrees
+.worktrees/
+
 # screenshots (except docs/)
 *.png
 !docs/*.png
