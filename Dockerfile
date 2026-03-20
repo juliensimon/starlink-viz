@@ -9,6 +9,7 @@ RUN npm ci
 COPY . .
 
 ENV DEMO_MODE=true
+ENV NEXT_PUBLIC_HF_SPACE=true
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
