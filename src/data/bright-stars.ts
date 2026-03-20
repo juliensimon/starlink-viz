@@ -58,7 +58,7 @@ export const BRIGHT_STARS: BrightStar[] = [
   { name: 'Saiph',        ra:  87.740, dec:  -9.670, mag:  2.09, bv: -0.18 },
 
   // ══════════════════════════════════════════════════════════════
-  // Bright unnamed stars and constellation vertices (mag ~1.3–3.5)
+  // Bright unnamed stars and constellation vertices (mag ~0.8–4.0)
   // ══════════════════════════════════════════════════════════════
   { name: '',  ra: 263.402, dec: -37.104, mag: 1.63, bv: -0.22 },  // Shaula (λ Sco)
   { name: '',  ra: 264.330, dec: -43.000, mag: 1.87, bv: -0.20 },  // Sargas (θ Sco)
@@ -183,7 +183,7 @@ export const BRIGHT_STARS: BrightStar[] = [
 
   // ══════════════════════════════════════════════════════════════
   // Additional constellation vertex stars and fainter fill stars
-  // (mag ~3.0–5.0, organized roughly by RA)
+  // (mag ~3.0–4.0, organized roughly by RA)
   // ══════════════════════════════════════════════════════════════
 
   // Pisces / Cetus / Sculptor / Phoenix / Tucana (RA 340-30)

@@ -34,7 +34,7 @@ interface AppState {
   focusDishRequested: number; // increment to trigger focus
   tleLastFetched: number | null; // timestamp of last successful TLE fetch
   wsConnected: boolean;
-  altitudeFilter: boolean; // filter to operational altitude band (530-580 km)
+  altitudeFilter: boolean; // filter to per-shell operational altitude bands (see config.ts)
   hudVisible: boolean;
   islPrediction: boolean;
   demoLocation: DemoLocation | null;
