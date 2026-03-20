@@ -11,6 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Run all tests**: `npm run test` (vitest)
 - **Run single test**: `npx vitest run src/__tests__/coordinates.test.ts`
 - **Update ground stations data**: `npm run update-gs`
+- **Type check**: `npx tsc --noEmit` (runs in CI before tests)
+- No linter or formatter is configured
 
 ## Architecture
 
@@ -23,6 +25,15 @@ Custom HTTP server wrapping Next.js that handles:
 - **WebSocket server** (`src/lib/websocket/server.ts`) — broadcasts dish telemetry, handoff events, and event log messages to all connected clients
 - **Demo mode** — auto-detected when no dish is reachable; uses mock data generators from `src/lib/grpc/mock-data.ts`. Controllable via `DEMO_MODE` env var (`true`/`false`/`auto`) and `/api/mode` endpoint
 - **Polling loops** — status (1s), history (5s), PoP detection (10s), traceroute (60s)
+
+### API Routes (`src/app/api/`)
+
+- `/api/tle` — CelesTrak Starlink TLE data (6h in-memory cache)
+- `/api/tle-gps` — GPS constellation TLE data
+- `/api/ground-stations` — gateway catalog from `data/ground-stations.json`
+- `/api/pop` — public IP + rDNS PoP city detection (5m cache)
+- `/api/isl-log` — ISL route decision log (GET last 100 lines / POST append)
+- `/api/mode` — GET/POST runtime demo/live mode switching (handled in `server.ts`, not Next.js)
 
 ### Frontend
 
@@ -111,3 +122,20 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 - React strict mode is off (`reactStrictMode: false` in next.config.ts)
 - Tests live in `src/__tests__/` and run in Node environment (vitest)
 - CelesTrak "Starlink" group may include Starshield/military objects alongside commercial satellites
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DISH_ADDRESS` | `192.168.100.1:9200` | Starlink dish gRPC endpoint |
+| `DEMO_MODE` | `auto` | `true`/`false`/`auto` — auto-detects dish availability |
+| `NEXT_PUBLIC_DISH_LAT` | `48.860` | Dish latitude for satellite/sky calculations |
+| `NEXT_PUBLIC_DISH_LON` | `2.350` | Dish longitude |
+| `STATUS_POLL_MS` | `1000` | Dish status polling interval |
+| `HISTORY_POLL_MS` | `5000` | Telemetry history polling interval |
+| `POP_POLL_MS` | `10000` | PoP detection polling interval |
+| `TELEMETRY_LOG_EVERY` | `5` | Log to event log every Nth status poll |
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`): `tsc --noEmit` → `npm test` → `npm run build` on Node 20+22, triggered on push/PR to master
