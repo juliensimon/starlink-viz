@@ -39,8 +39,10 @@ function shellIndex(inc: number): number {
   return 0;                 // 33°
 }
 
-const GS_OPERATIONAL = GROUND_STATIONS.filter((gs) => gs.status !== 'planned').length;
-const GS_PLANNED = GROUND_STATIONS.filter((gs) => gs.status === 'planned').length;
+const GS_GATEWAYS = GROUND_STATIONS.filter((gs) => gs.type !== 'pop');
+const GS_OPERATIONAL = GS_GATEWAYS.filter((gs) => gs.status !== 'planned').length;
+const GS_PLANNED = GS_GATEWAYS.filter((gs) => gs.status === 'planned').length;
+const GS_POPS = GROUND_STATIONS.filter((gs) => gs.type === 'pop').length;
 
 function formatTleAge(timestamp: number | null): string {
   if (timestamp === null) return 'n/a';
@@ -218,6 +220,13 @@ export default function HandoffPanel() {
               <span className="text-white/30">{GS_PLANNED} planned</span>
             </>
           )}
+        </span>
+      </div>
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-[10px] text-white/50">PoPs</span>
+        <span className="text-[10px] tabular-nums text-white/60">
+          <span style={{ color: '#66ccff' }}>{GS_POPS}</span>
+          <span className="text-white/30"> cities</span>
         </span>
       </div>
 
