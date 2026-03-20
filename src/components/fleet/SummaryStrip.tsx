@@ -7,7 +7,8 @@ interface SummaryData {
   operational: number;
   islCapable: number;
   raising: number;
-  deorbiting: number;
+  decayed: number;
+  launched2026: number;
 }
 
 interface SummaryStripProps {
@@ -19,12 +20,13 @@ const CARDS: Array<{ key: keyof SummaryData; label: string; color: string; descr
   { key: 'operational', label: 'OPERATIONAL', color: '#4ade80', description: 'At target shell altitude' },
   { key: 'islCapable', label: 'ISL CAPABLE', color: '#60a5fa', description: 'Laser inter-satellite links' },
   { key: 'raising', label: 'ORBIT RAISING', color: '#fbbf24', description: 'Below target, climbing' },
-  { key: 'deorbiting', label: 'DEORBITING', color: '#f87171', description: 'Descending >1 km/day' },
+  { key: 'decayed', label: 'DECAYED', color: '#94a3b8', description: 'Reentered atmosphere' },
+  { key: 'launched2026', label: 'LAUNCHED 2026', color: '#c084fc', description: "This year's deployments" },
 ];
 
 export function SummaryStrip({ data }: SummaryStripProps) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
       {CARDS.map(({ key, label, color, description }) => (
         <div
           key={key}

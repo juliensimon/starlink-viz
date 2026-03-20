@@ -5,7 +5,7 @@ let db: Database.Database | null = null;
 export function initDatabase(path: string = 'data/fleet.db'): Database.Database {
   db = new Database(path);
   db.pragma('journal_mode = WAL');
-  db.pragma('busy_timeout = 5000');
+  db.pragma('busy_timeout = 30000');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS tle_snapshots (

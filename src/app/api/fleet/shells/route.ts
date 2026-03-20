@@ -1,16 +1,10 @@
-import { initDatabase } from '@/lib/fleet/db';
-import { queryShells, getRecordCount, getLastIngestDate } from '@/lib/fleet/queries';
+import { getShellsSummary } from '@/lib/fleet/hf-dataset';
 
 export async function GET() {
   try {
-    initDatabase();
-    const [shells, recordCount, lastIngest] = await Promise.all([
-      queryShells(),
-      getRecordCount(),
-      getLastIngestDate(),
-    ]);
-    return Response.json({ shells, recordCount, lastIngest });
+    const data = await getShellsSummary();
+    return Response.json(data);
   } catch {
-    return Response.json([], { status: 200 });
+    return Response.json({ shells: [], recordCount: 0, lastIngest: null });
   }
 }

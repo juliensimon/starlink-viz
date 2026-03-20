@@ -33,8 +33,14 @@ function toQuarterKey(date: string): string {
   const [yearStr, monthStr] = date.split('-');
   const month = parseInt(monthStr, 10);
   const quarter = Math.ceil(month / 3);
-  const shortYear = yearStr.slice(2);
-  return `Q${quarter}'${shortYear}`;
+  // Sortable format: "2019-Q1" sorts correctly, displayed as "Q1'19"
+  return `${yearStr}-Q${quarter}`;
+}
+
+function formatQuarterLabel(key: string): string {
+  // "2019-Q1" → "Q1'19"
+  const [year, q] = key.split('-');
+  return `${q}'${year.slice(2)}`;
 }
 
 function groupData(rows: RawRow[], grouping: Grouping): GroupedRow[] {
@@ -104,6 +110,7 @@ export function LaunchCadence() {
             tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}
             tickLine={false}
             axisLine={false}
+            tickFormatter={grouping === 'quarterly' ? formatQuarterLabel : undefined}
           />
           <YAxis
             tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}
