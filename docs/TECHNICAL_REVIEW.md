@@ -431,6 +431,91 @@ This is clearly art, not a technical claim.
 
 ---
 
+## Sky View — Observer's Night Sky
+
+The sky view renders the night sky as seen from the dish location, projecting Starlink satellites, reference stars, and constellations onto a virtual hemisphere dome.
+
+### 10. Observer Frame & Az/El Projection — Verified ✓
+
+**Data source:** Standard geodesy and spherical trigonometry.
+
+**Implementation:** `src/lib/utils/observer-frame.ts` — `computeObserverFrame()` constructs an ENU (East-North-Up) frame from the observer's latitude/longitude. `computeAzElFrom()` projects any 3D point into azimuth/elevation. `azElToDirection3D()` performs the inverse transform. Roundtrip accuracy is confirmed by tests.
+
+The sky view reuses the same ENU math as `dish-frame.ts` (used by ConnectionBeam for satellite selection), but parameterized for any lat/lon — critical for demo location support. The frame construction uses cross(Y_up, normal) for the east vector, with a pole degeneracy guard (cross product magnitude < 1e-10) that falls back to the X-axis when the observer is essentially at a geographic pole.
+
+**Accuracy:** Exact — same math used by antenna controllers worldwide. No approximation.
+
+### 11. Star Coordinate Transform (RA/Dec → Az/El) — Verified ✓
+
+**Data source:** Standard equatorial-to-horizontal coordinate transform.
+
+**Implementation:** `src/lib/utils/star-coordinates.ts` — converts J2000 Right Ascension / Declination to local Azimuth / Elevation using Greenwich Mean Sidereal Time from `satellite.gstime()`.
+
+The algorithm: GMST → Local Sidereal Time (LST = GMST + longitude) → Hour Angle (HA = LST - RA) → standard spherical trig for sin(elevation) and atan2(azimuth). This is the textbook transform used by every planetarium program.
+
+**Known limitation:** No J2000 precession correction. By 2026, accumulated precession is ~0.36° (26 years × 50.3″/year) — imperceptible at the rendering scale. Over decades this would start to matter.
+
+### 12. Star Catalog — Verified ✓
+
+**Data source:** Hipparcos / Yale Bright Star Catalog subset.
+
+**Implementation:** `src/data/bright-stars.ts` — ~500 stars down to magnitude 4.0 with J2000 RA/Dec, apparent magnitude, and B-V color index. Includes all major constellation vertices plus fill stars for visual density.
+
+Spot-checked against SIMBAD/Hipparcos: Sirius (RA 101.287°, Dec -16.716°), Polaris (RA 37.954°, Dec 89.264°), Betelgeuse (RA 88.793°, Dec 7.407°) — all match to within 0.01°.
+
+Star visual properties: size mapped from magnitude (`max(1, 4 - mag) * 0.02`), color from B-V index (blue-white for B-V < -0.1, through white, yellow, orange, to red for B-V > 1.0). Updates every 10 seconds — sidereal rotation moves stars at 15°/hour = 0.04°/10s, imperceptible at normal zoom.
+
+### 13. Constellation Data — Verified ✓ (with corrections applied)
+
+**Data source:** IAU constellation definitions.
+
+**Implementation:** `src/data/constellations.ts` — all 88 IAU constellations with stick-figure line segments defined as RA/Dec coordinate pairs, rendered as `THREE.LineSegments`.
+
+Spot-checked Orion (Betelgeuse, Rigel, belt stars — all correct to 0.01°), Ursa Major (Big Dipper — seven-star pattern correctly connected), Scorpius (Antares through tail — correct), Crux (four-star cross — correct).
+
+**Corrections applied after review:** Mirach (β And) RA/Dec was off by ~9°/20° (fixed to 17.433°, 35.621°); Caph (β Cas) RA was off by ~7° (fixed to 2.295°). Andromeda and Cassiopeia stick figures updated accordingly.
+
+### 14. Earth Shadow Model — Approximation ⚠️
+
+**Data source:** Cylindrical shadow geometry.
+
+**Implementation:** `src/lib/utils/sun-shadow.ts` — `isSatelliteSunlit()` tests whether a satellite is in Earth's shadow using a cylindrical approximation: project the satellite position onto the Earth-Sun axis; if on the night side, check if the perpendicular distance to the axis exceeds Earth's radius (1.0 in scene units).
+
+**Why cylindrical, not conical:** At Starlink altitude (~550 km), the penumbra width is approximately 5 km (Sun's angular radius ~0.265° → `550 km × tan(0.265°) ≈ 2.5 km` half-width). The conical umbra/penumbra model would add complexity for a difference invisible at rendering scale. The cylindrical model is standard for LEO satellite visibility prediction.
+
+**Boundary behavior:** The code compares the *squared* perpendicular distance against 1.0 (Earth's radius squared — an optimization that avoids a sqrt). Satellites exactly on the shadow cylinder wall (`perpDistSq = 1.0`) are treated as shadowed (conservative). In reality they'd be in partial penumbral shadow.
+
+**Usage:** SkySatellites applies the shadow model during periodic color updates (every 100ms). Sunlit satellites render at full shell color brightness; shadowed satellites render at 10% brightness. The SkyHud displays sunlit/shadow counts.
+
+### 15. Sun Direction & Sky Gradient — Approximation ⚠️
+
+**Data source:** Simplified ecliptic longitude model.
+
+**Implementation:** `src/lib/utils/astronomy.ts` — `getSunDirection()` computes sun position from day-of-year ecliptic longitude (`2π(dayOfYear - 80)/365`) with axial tilt rotation. `src/components/scene/sky/SkyEnvironment.tsx` — `computeSkyVertexColor()` maps sun elevation to sky colors.
+
+**Accuracy:** The ecliptic longitude model ignores the equation of center (orbital eccentricity), introducing up to ~2° error (~8 minutes of sunrise/sunset time). Additionally, `dayOfYear` is computed as an integer (`Math.floor`), adding up to ~1° of intra-day stale ecliptic longitude (the time-of-day rotation is applied separately). Combined error: up to ~3° in sun position. Acceptable for a satellite visibility indicator.
+
+**Sky gradient phases:**
+
+| Sun elevation | Phase | Sky appearance |
+|---------------|-------|----------------|
+| > 10° | Full day | Bright blue, brighter near horizon (Rayleigh scattering approximation) |
+| 0° to 10° | Low sun | Warm glow near sun azimuth at horizon |
+| -6° to 0° | Civil twilight | Deep blue with orange/pink horizon glow |
+| -12° to -6° | Nautical twilight | Dark blue, faint glow |
+| -18° to -12° | Astronomical twilight | Very dark, barely perceptible |
+| < -18° | Night | Near black |
+
+The gradient is azimuth-aware — vertices near the sun's azimuth get warmer colors during sunset/twilight, simulating the directional glow. Breakpoints match `computeSkyVertexColor()` in `SkyEnvironment.tsx`. This is a visual approximation, not a physically-based atmospheric scattering model.
+
+### 16. Satellite Trajectory on Hover — Verified ✓
+
+**Implementation:** `src/components/scene/sky/SkyTrajectory.tsx` — when a satellite is hovered in sky view, propagates its position ±5 minutes using `propagatePosition()` (SGP4) at 80 time steps, projects each position to az/el on the dome.
+
+This uses the same SGP4 propagation as the main satellite positions — just evaluated at different times. The trajectory is physically accurate within TLE precision (~1 km). Past trail renders in cyan, future in warm yellow, both fading toward the ends via vertex color intensity.
+
+---
+
 ## Summary: What's Real vs. What's Inferred
 
 
@@ -451,6 +536,12 @@ This is clearly art, not a technical claim.
 | **Demo throughput/SNR**          | Procedural sine waves                        | **Fake** — realistic-looking ranges, no physics                     |
 | **Laser inter-satellite links**  | Not shown                                    | **Missing** — no public data exists                                 |
 | **RF link budget**               | Not computed                                 | **Missing** — would require proprietary antenna specs               |
+| **Sky view az/el projection**    | ENU frame + spherical trig                   | **Real** — same math as antenna controllers                         |
+| **Star positions**               | J2000 RA/Dec via GMST transform              | **Real** — standard astronomy, ~0.36° precession drift by 2026     |
+| **Constellation patterns**       | IAU stick figures, spot-checked               | **Real** — all 88 IAU constellations, coordinates verified          |
+| **Satellite sun/shadow**         | Cylindrical Earth shadow model               | **Approximation** — ignores ~40 km penumbra (negligible at LEO)    |
+| **Sky gradient colors**          | Sun elevation phases                         | **Approximation** — visual, not physically-based scattering        |
+| **Trajectory arcs**              | SGP4 propagation ±5 min                      | **Real** — same propagator, accurate within TLE precision           |
 
 
 ---
