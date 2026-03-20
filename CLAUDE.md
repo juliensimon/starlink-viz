@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Start production**: `npm run start`
 - **Run all tests**: `npm run test` (vitest)
 - **Run single test**: `npx vitest run src/__tests__/coordinates.test.ts`
-- **Update ground stations data**: `npm run update-gs`
+- **Update ground stations data**: `npm run update-gs` (multi-source: starlinkinsider.com + starlink.sx + PoP list)
+- **Sync fallback stations**: `npx tsx scripts/sync-fallback.ts` (regenerate embedded fallback array from JSON)
 - **Type check**: `npx tsc --noEmit` (runs in CI before tests)
 - No linter or formatter is configured
 
@@ -98,7 +99,14 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 
 ### Ground Stations (`data/ground-stations.json`)
 
-204 gateways (168 operational, 36 planned) sourced from FCC IBFS, Starlink Insider, and international regulatory filings. Planned stations are rendered with reduced opacity and **excluded from gateway selection routing** in `ConnectionBeam.tsx`. Fallback data is embedded in `src/lib/satellites/ground-stations.ts`.
+357 stations (307 gateways + 50 PoPs) with `type` field (`'gateway'` | `'pop'`) and `status` field (`'operational'` | `'planned'`). Data sourced from:
+- **[Starlink Insider](https://starlinkinsider.com/starlink-gateway-locations/)** — community-curated gateway list with operational status
+- **[starlink.sx](https://starlink.sx/gateways.json)** — structured JSON with coordinates, antenna counts, Ka/E-band status
+- **[starlink-geoip-data](https://github.com/clarkzjw/starlink-geoip-data)** — PoP cities from Starlink rDNS records (`customer.<pop>.pop.starlinkisp.net`)
+
+Planned stations are rendered with reduced opacity. Both planned and PoP entries are **excluded from gateway selection routing** in `isl-pathfinder.ts`. Fallback data is embedded in `src/lib/satellites/ground-stations.ts` (auto-synced via `scripts/sync-fallback.ts`).
+
+**Auto-update workflow** (`.github/workflows/update-ground-stations.yml`): runs weekly Monday 06:00 UTC, fetches from all sources, reconciles (name normalization, coordinate dedup within 5km, status merge, sanity checks), syncs fallback, runs tests, and opens a PR if data changed. Uses `data/ground-stations-meta.json` for `lastSeen` tracking (gitignored).
 
 ### Sky View Utilities
 
@@ -138,4 +146,5 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 
 ### CI
 
-GitHub Actions (`.github/workflows/ci.yml`): `tsc --noEmit` → `npm test` → `npm run build` on Node 20+22, triggered on push/PR to master
+- **CI** (`.github/workflows/ci.yml`): `tsc --noEmit` → `npm test` → `npm run build` on Node 20+22, triggered on push/PR to master
+- **Ground station updates** (`.github/workflows/update-ground-stations.yml`): weekly Monday 06:00 UTC + manual dispatch. Fetches sources → reconciles → syncs fallback → tests → opens PR via `peter-evans/create-pull-request`

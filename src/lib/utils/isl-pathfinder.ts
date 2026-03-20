@@ -27,9 +27,9 @@ const gsPositions = GROUND_STATIONS.map((gs) => {
   return geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
 });
 
-// Operational station indices only
+// Operational gateway indices only (exclude planned stations and PoPs)
 const operationalGSIndices = GROUND_STATIONS
-  .map((gs, i) => (gs.status !== 'planned' ? i : -1))
+  .map((gs, i) => (gs.status !== 'planned' && gs.type !== 'pop' ? i : -1))
   .filter((i) => i >= 0);
 
 /**
