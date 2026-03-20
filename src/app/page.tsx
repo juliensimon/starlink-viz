@@ -68,7 +68,9 @@ export default function Home() {
         }}>
           <span style={{ color: 'var(--color-accent, #00ffff)' }}>Starlink Mission Control</span>
           <span style={{ opacity: 0.4 }}>—</span>
-          <span>Real-time 3D satellite tracker with SGP4 propagation, ISL routing, and live dish telemetry</span>
+          <span>Real-time 3D satellite tracker with Space view, Sky view, SGP4 propagation, ISL routing, and live dish telemetry</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>Simulated telemetry — run locally to connect your dish</span>
           <span style={{ opacity: 0.4 }}>·</span>
           <a href="https://github.com/juliensimon/starlink-viz" target="_blank" rel="noopener noreferrer"
             style={{ color: 'var(--color-accent, #00ffff)', textDecoration: 'none' }}>
