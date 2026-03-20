@@ -75,7 +75,7 @@ export default function SkyHud() {
 
     const update = () => setStats(computeStats());
     update();
-    const interval = setInterval(update, 2000);
+    const interval = setInterval(update, 5000);
     return () => clearInterval(interval);
   }, [cameraMode]);
 

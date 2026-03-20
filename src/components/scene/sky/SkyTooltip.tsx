@@ -127,27 +127,14 @@ export default function SkyTooltip() {
       const x = positions[pi], y = positions[pi + 1], z = positions[pi + 2];
       if (x === 0 && y === 0 && z === 0) continue;
 
-      const { el } = computeAzElFrom(frame, x, y, z);
-      if (el < 0) continue; // below horizon
+      const { az, el } = computeAzElFrom(frame, x, y, z);
+      if (el < 0) continue;
 
-      // Get the dome position from the instance matrix
-      // Faster: project the orbital position through the dome mapping
-      const { az } = computeAzElFrom(frame, x, y, z);
-      const azRad = az * Math.PI / 180;
-      const elRad = el * Math.PI / 180;
-      const cosEl = Math.cos(elRad);
-      const sinEl = Math.sin(elRad);
-      const sinAz = Math.sin(azRad);
-      const cosAz = Math.cos(azRad);
-
-      const dx = sinAz * cosEl * frame.east.x + cosAz * cosEl * frame.north.x + sinEl * frame.normal.x;
-      const dy = sinAz * cosEl * frame.east.y + cosAz * cosEl * frame.north.y + sinEl * frame.normal.y;
-      const dz = sinAz * cosEl * frame.east.z + cosAz * cosEl * frame.north.z + sinEl * frame.normal.z;
-
+      const dir = azElToDirection3D(frame, az, el);
       _projected.set(
-        frame.pos.x + dx * DOME_RADIUS,
-        frame.pos.y + dy * DOME_RADIUS,
-        frame.pos.z + dz * DOME_RADIUS
+        frame.pos.x + dir.x * DOME_RADIUS,
+        frame.pos.y + dir.y * DOME_RADIUS,
+        frame.pos.z + dir.z * DOME_RADIUS
       ).project(camera);
 
       if (_projected.z > 1) continue;
@@ -241,21 +228,11 @@ export default function SkyTooltip() {
       const sunlit = isSatelliteSunlit(x, y, z, sunDir.x, sunDir.y, sunDir.z);
 
       // Project dome position for tooltip screen coords
-      const azRad = az * Math.PI / 180;
-      const elRad = el * Math.PI / 180;
-      const cosEl = Math.cos(elRad);
-      const sinEl = Math.sin(elRad);
-      const sinAz = Math.sin(azRad);
-      const cosAz = Math.cos(azRad);
-
-      const dx = sinAz * cosEl * frame.east.x + cosAz * cosEl * frame.north.x + sinEl * frame.normal.x;
-      const dy = sinAz * cosEl * frame.east.y + cosAz * cosEl * frame.north.y + sinEl * frame.normal.y;
-      const dz = sinAz * cosEl * frame.east.z + cosAz * cosEl * frame.north.z + sinEl * frame.normal.z;
-
+      const tooltipDir = azElToDirection3D(frame, az, el);
       _projected.set(
-        frame.pos.x + dx * DOME_RADIUS,
-        frame.pos.y + dy * DOME_RADIUS,
-        frame.pos.z + dz * DOME_RADIUS
+        frame.pos.x + tooltipDir.x * DOME_RADIUS,
+        frame.pos.y + tooltipDir.y * DOME_RADIUS,
+        frame.pos.z + tooltipDir.z * DOME_RADIUS
       ).project(camera);
 
       dispatchSkyTooltip({
