@@ -74,7 +74,7 @@ export default function Home() {
           <span style={{ opacity: 0.4 }}>·</span>
           <a href="https://github.com/juliensimon/starlink-viz" target="_blank" rel="noopener noreferrer"
             style={{ color: 'var(--color-accent, #00ffff)', textDecoration: 'none' }}>
-            GitHub ↗
+            Code &amp; docs on GitHub ↗
           </a>
         </div>
       )}
