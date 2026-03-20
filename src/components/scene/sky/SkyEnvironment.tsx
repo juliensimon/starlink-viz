@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '@/stores/app-store';
@@ -195,6 +195,21 @@ export default function SkyEnvironment() {
 
     return group;
   }, [frame]);
+
+  // Dispose GPU resources when frame changes (demo location switch) or unmount
+  useEffect(() => {
+    return () => {
+      groundMesh.geometry.dispose();
+      (groundMesh.material as THREE.Material).dispose();
+      skyData.mesh.geometry.dispose();
+      (skyData.mesh.material as THREE.Material).dispose();
+      horizonLines.traverse((obj) => {
+        if (obj instanceof THREE.Line) {
+          obj.geometry.dispose();
+        }
+      });
+    };
+  }, [groundMesh, skyData.mesh, horizonLines]);
 
   return (
     <group>

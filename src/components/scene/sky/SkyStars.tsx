@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo, useCallback, useState } from 'react';
+import { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Billboard, Text } from '@react-three/drei';
@@ -132,7 +132,7 @@ export default function SkyStars() {
   }, [geometry, frame, lat, lon, starCount]);
 
   // Initial position computation
-  useMemo(() => { updatePositions(); }, [updatePositions]);
+  useEffect(() => { updatePositions(); }, [updatePositions]);
 
   useFrame(() => {
     const now = performance.now();
