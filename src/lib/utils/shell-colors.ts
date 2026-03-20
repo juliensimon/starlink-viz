@@ -8,7 +8,7 @@ export const DIM_RED = new THREE.Color('#ff4466');      // 97.6° polar shell
 export const CONE_COLOR = new THREE.Color('#dd55ff');
 export const BRIGHT_COLOR = new THREE.Color('#ff3366');
 
-/** Map orbital inclination to a shell color. NaN falls through to DIM_BLUE. */
+/** Map orbital inclination to a shell color. NaN falls through to DIM_YELLOW (33° shell). */
 export function getDimColor(inclination: number): THREE.Color {
   if (inclination >= 80) return DIM_RED;      // 97.6° polar
   if (inclination >= 60) return DIM_GREEN;    // 70° shell
