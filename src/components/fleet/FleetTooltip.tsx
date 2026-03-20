@@ -2,14 +2,17 @@
 
 import React from 'react';
 
-interface FleetTooltipProps {
+export interface FleetTooltipProps {
   active?: boolean;
   payload?: Array<{ name?: string; value?: number; color?: string }>;
   label?: string;
+  formatter?: (v: number) => string;
 }
 
-export function FleetTooltip({ active, payload, label }: FleetTooltipProps) {
+export function FleetTooltip({ active, payload, label, formatter }: FleetTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
+
+  const fmt = formatter || ((v: number) => v.toLocaleString());
 
   return (
     <div
@@ -25,7 +28,7 @@ export function FleetTooltip({ active, payload, label }: FleetTooltipProps) {
       <div style={{ fontWeight: 'bold', color: '#fff', marginBottom: 4 }}>{label}</div>
       {payload.map((entry, i) => (
         <div key={i} style={{ color: entry.color || '#fff', marginTop: 2 }}>
-          {entry.name}: {entry.value?.toLocaleString()}
+          {entry.name}: {entry.value != null ? fmt(entry.value) : '\u2014'}
         </div>
       ))}
     </div>

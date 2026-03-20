@@ -25,7 +25,9 @@ export function ShellFillRate({ shells }: ShellFillRateProps) {
         {SHELL_ORDER.map((id) => {
           const target = SHELL_TARGETS[id];
           const count = shellMap.get(id) ?? 0;
-          const pct = target.target > 0 ? Math.min((count / target.target) * 100, 100) : 0;
+          const pct = target.target > 0 ? (count / target.target) * 100 : 0;
+          const barPct = Math.min(pct, 100);
+          const overTarget = pct > 100;
           const sc = SHELL_COLORS[id];
 
           return (
@@ -59,7 +61,7 @@ export function ShellFillRate({ shells }: ShellFillRateProps) {
                 <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
                   <span style={{ color: '#fff' }}>{count.toLocaleString()}</span>
                   <span style={{ color: 'rgba(255,255,255,0.3)' }}> / {target.target.toLocaleString()}</span>
-                  <span style={{ color: sc.color, marginLeft: 6 }}>{pct.toFixed(1)}%</span>
+                  <span style={{ color: overTarget ? '#4ade80' : sc.color, marginLeft: 6 }}>{pct.toFixed(1)}%</span>
                 </div>
               </div>
 
@@ -75,7 +77,7 @@ export function ShellFillRate({ shells }: ShellFillRateProps) {
                 <div
                   style={{
                     height: '100%',
-                    width: `${pct}%`,
+                    width: `${barPct}%`,
                     borderRadius: 5,
                     background: `linear-gradient(90deg, ${sc.color}cc, ${sc.color})`,
                     transition: 'width 0.6s ease',

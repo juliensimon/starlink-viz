@@ -49,6 +49,7 @@ export function IslCoverage() {
     }
 
     return Array.from(byDate.entries())
+      .filter(([, { isl }]) => isl > 0) // Only show dates where ISL sats exist
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, { isl, ops }]): ChartPoint => ({
         date,
@@ -60,7 +61,7 @@ export function IslCoverage() {
     <ChartPanel
       title="ISL Coverage"
       subtitle="% of operational fleet with laser inter-satellite link capability"
-      footnote="ISL capability estimated via launch-year + inclination heuristic (polar shells always, 53° from 2022, 43° from 2023, 33° from 2024)"
+      footnote="ISL heuristic: polar shells always, 53° from 2022, 43° from 2023, 33° from 2024. Shown from Sep 2021 (first v1.5 launch)."
     >
       <ResponsiveContainer width="100%" height={260}>
         <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>

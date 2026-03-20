@@ -91,17 +91,19 @@ export function rebuildDailySnapshots(date: string): void {
       INNER JOIN (
         SELECT norad_id, MAX(epoch_ts) AS max_ts
         FROM tle_snapshots
+        WHERE date(epoch_ts, 'unixepoch') <= ?
         GROUP BY norad_id
       ) m ON t.norad_id = m.norad_id AND t.epoch_ts = m.max_ts
     ) latest
     LEFT JOIN (
       SELECT norad_id, MIN(epoch_ts) AS first_ts
       FROM tle_snapshots
+      WHERE date(epoch_ts, 'unixepoch') <= ?
       GROUP BY norad_id
     ) first_seen ON latest.norad_id = first_seen.norad_id
     WHERE latest.status != 'decayed'
     GROUP BY latest.shell_id
-  `).run(date);
+  `).run(date, date, date);
 }
 
 export function queryGrowth(from?: string, to?: string): DailySnapshotRow[] {

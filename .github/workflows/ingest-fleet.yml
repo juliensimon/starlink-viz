@@ -1,0 +1,43 @@
+name: Ingest Fleet TLEs
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run TLE ingest
+        run: npx tsx scripts/ingest-tles.ts
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet data/fleet.db; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated fleet DB
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/fleet.db data/last-celestrak-response.json
+          git commit -m "chore: daily fleet TLE ingest [automated]"
+          git push
