@@ -45,9 +45,10 @@ yarn-error.log*
 # worktrees
 .worktrees/
 
-# screenshots (except docs/)
+# screenshots (except docs/ and public/textures/)
 *.png
 !docs/*.png
+!public/textures/*.png
 
 # typescript
 *.tsbuildinfo

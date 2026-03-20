@@ -32,6 +32,7 @@ COPY --from=builder /app/data ./data
 COPY --from=builder /app/server.ts ./
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/postcss.config.mjs ./
 COPY --from=builder /app/tsconfig.json ./
 
 EXPOSE 7860
