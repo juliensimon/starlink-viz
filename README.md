@@ -10,9 +10,7 @@ pinned: false
 
 # starlink-viz
 
-> **[GitHub Repository](https://github.com/juliensimon/starlink-viz)** | **[Technical Documentation](https://github.com/juliensimon/starlink-viz/blob/master/docs/TECHNICAL_REVIEW.md)** | **[User Guide](https://github.com/juliensimon/starlink-viz/blob/master/docs/USER_GUIDE.md)**
->
-> This Space runs in demo mode with simulated dish telemetry. Connect a real Starlink dish by running locally — see the [User Guide](https://github.com/juliensimon/starlink-viz/blob/master/docs/USER_GUIDE.md) for setup instructions.
+> **[Live Demo on Hugging Face Spaces](https://huggingface.co/spaces/juliensimon/starlink-mission-control)** | **[Technical Documentation](docs/TECHNICAL_REVIEW.md)** | **[User Guide](docs/USER_GUIDE.md)**
 
 Real-time 3D Starlink satellite tracker and mission control dashboard. Track every satellite in the SpaceX Starlink constellation, monitor live dish telemetry, visualize ground stations, watch satellite handoffs, and predict inter-satellite laser link (ISL) routing — all computed from publicly available data. Includes a Stellarium-style night sky view with constellations and sun illumination modeling. Built with Next.js, React Three Fiber, and Three.js.
 
