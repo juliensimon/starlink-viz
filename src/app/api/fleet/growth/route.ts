@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const to = request.nextUrl.searchParams.get('to') || undefined;
     const data = await getGrowthData(from, to);
     return Response.json(data);
-  } catch {
+  } catch (err) { console.error("[fleet]", err);
     return Response.json([]);
   }
 }

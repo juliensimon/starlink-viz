@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const shell = request.nextUrl.searchParams.get('shell') || '2';
     const data = await getPlaneData(parseInt(shell));
     return Response.json(data);
-  } catch {
+  } catch (err) { console.error("[fleet]", err);
     return Response.json([]);
   }
 }

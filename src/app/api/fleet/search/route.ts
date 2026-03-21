@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     if (q.length < 2) return Response.json([]);
     const data = await searchSatellites(q);
     return Response.json(data);
-  } catch {
+  } catch (err) { console.error("[fleet]", err);
     return Response.json([]);
   }
 }
