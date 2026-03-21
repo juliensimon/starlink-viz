@@ -7,7 +7,7 @@ import { useAppStore } from '@/stores/app-store';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 import { getPositionsArray, getSatelliteCount, getSatelliteName, setConnectedGroundStation, setCurrentRoute, getCurrentRoute, setDetectedPop } from '@/lib/satellites/satellite-store';
 import { geodeticToCartesian } from '@/lib/utils/coordinates';
-import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
+import { GROUND_STATIONS, groundStationsVersion } from '@/lib/satellites/ground-stations';
 import { DISH_POS, computeAzEl, azElToDirection } from '@/lib/utils/dish-frame';
 import { computeGeometricLatency } from '@/lib/utils/geometric-latency';
 import { MAX_STEERING_DEG, MIN_ELEVATION_DEG, EARTH_RADIUS_KM, MIN_OPERATIONAL_ALT_KM, MAX_OPERATIONAL_ALT_KM, ISL_GRAPH_REBUILD_MS, ISL_PATHFIND_INTERVAL_MS, ISL_MAX_HOPS } from '@/lib/config';
@@ -26,17 +26,23 @@ const ISL_PARTICLE_COUNT = 20; // fewer particles per ISL hop for performance
 const BEAM_SEGMENTS = 50;
 const BEAM_VERTS = BEAM_SEGMENTS + 1;
 
-// Precompute ground station 3D positions
-const gsPositions = GROUND_STATIONS.map((gs) => {
-  const { x, y, z } = geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
-  return new THREE.Vector3(x, y, z);
-});
+// Lazily computed — rebuilt when groundStationsVersion changes
+let gsPositions: THREE.Vector3[] = [];
+let operationalGSIndices: number[] = [];
+let beamGSVersion = -1;
 
-// Indices of operational stations only — planned/under-construction stations
-// are excluded from gateway selection routing.
-const operationalGSIndices = GROUND_STATIONS
-  .map((gs, i) => (gs.status !== 'planned' ? i : -1))
-  .filter((i) => i >= 0);
+function ensureBeamGSData() {
+  if (beamGSVersion !== groundStationsVersion) {
+    gsPositions = GROUND_STATIONS.map((gs) => {
+      const { x, y, z } = geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
+      return new THREE.Vector3(x, y, z);
+    });
+    operationalGSIndices = GROUND_STATIONS
+      .map((gs, i) => (gs.status !== 'planned' ? i : -1))
+      .filter((i) => i >= 0);
+    beamGSVersion = groundStationsVersion;
+  }
+}
 
 // Reusable temp vectors
 const _satPos = new THREE.Vector3();
@@ -50,6 +56,7 @@ let lastComputedLatencyMs = 0;
 // prevent rapid flickering between two equidistant stations. When a new
 // GS is selected, logs a gateway-switch event with the latency delta.
 function findNearestGS3D(satPos: THREE.Vector3): THREE.Vector3 {
+  ensureBeamGSData();
   let nearest = gsPositions[operationalGSIndices[0]];
   let nearestIdx = operationalGSIndices[0];
   let minDist = Infinity;
@@ -138,6 +145,7 @@ function findNearestSatAbove(dishX: number, dishY: number, dishZ: number): numbe
 // plus sat-to-nearest-GS. Used as a latency proxy when ranking satellites
 // with similar boresight alignment (lower path = lower latency).
 function totalPathLength(x: number, y: number, z: number): number {
+  ensureBeamGSData();
   const dxD = x - DISH_VEC.x, dyD = y - DISH_VEC.y, dzD = z - DISH_VEC.z;
   const distDish = Math.sqrt(dxD * dxD + dyD * dyD + dzD * dzD);
   let minGS = Infinity;
