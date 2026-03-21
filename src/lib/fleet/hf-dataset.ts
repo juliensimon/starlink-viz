@@ -85,7 +85,7 @@ export async function getShellsSummary() {
   `);
 
   const stats = await query<{ cnt: number; last: string }>(`
-    SELECT COUNT(*) as cnt, MAX(date) as last
+    SELECT COUNT(DISTINCT date) as cnt, MAX(date) as last
     FROM read_parquet('${DAILY_PATH}')
   `);
 
