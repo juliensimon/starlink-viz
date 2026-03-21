@@ -32,8 +32,9 @@ function ensureGSData(): void {
   gsPositions = GROUND_STATIONS.map((gs) =>
     geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1),
   );
+  // Operational gateway indices only (exclude planned stations and PoPs)
   operationalGSIndices = GROUND_STATIONS
-    .map((gs, i) => (gs.status !== 'planned' ? i : -1))
+    .map((gs, i) => (gs.status !== 'planned' && gs.type !== 'pop' ? i : -1))
     .filter((i) => i >= 0);
   // Invalidate PoP GS cache since station indices changed
   cachedPopGSIndices = null;
