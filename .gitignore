@@ -55,3 +55,7 @@ data/fleet.db-wal
 data/fleet.db-shm
 data/last-celestrak-response.json
 data/dataset/
+data/tle-archive/
+data/satcat/
+data/launch-log/
+data/bulk/
