@@ -54,6 +54,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Fleet monitor database
+data/fleet.db
+data/fleet.db-wal
+data/fleet.db-shm
+data/last-celestrak-response.json
+data/dataset/
+data/tle-archive/
+data/satcat/
+data/launch-log/
+data/bulk/
+
 # ground station update artifacts
 data/ground-stations-update-report.md
 data/ground-stations-meta.json

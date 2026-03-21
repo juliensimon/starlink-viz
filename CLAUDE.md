@@ -97,16 +97,26 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 - **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
 - **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 
-### Ground Stations (`data/ground-stations.json`)
+### Ground Stations (HF dataset)
 
-357 stations (307 gateways + 50 PoPs) with `type` field (`'gateway'` | `'pop'`) and `status` field (`'operational'` | `'planned'`). Data sourced from:
-- **[Starlink Insider](https://starlinkinsider.com/starlink-gateway-locations/)** — community-curated gateway list with operational status
-- **[starlink.sx](https://starlink.sx/gateways.json)** — structured JSON with coordinates, antenna counts, Ka/E-band status
-- **[starlink-geoip-data](https://github.com/clarkzjw/starlink-geoip-data)** — PoP cities from Starlink rDNS records (`customer.<pop>.pop.starlinkisp.net`)
+Loaded exclusively from HF dataset [`juliensimon/starlink-ground-stations`](https://huggingface.co/datasets/juliensimon/starlink-ground-stations) (gateways config). `GROUND_STATIONS` starts empty and is populated via `refreshGroundStations()`: server-side fetches from HF API directly, client-side fetches from `/api/ground-stations`. All derived data (3D positions in `GroundStations.tsx`/`ConnectionBeam.tsx`, backhaul RTT, ISL pathfinder arrays) uses lazy recomputation via `groundStationsVersion` counter. Stations have `type` field (`'gateway'` | `'pop'`) and `status` field (`'operational'` | `'planned'`). Planned stations are rendered with reduced opacity. Both planned and PoP entries are **excluded from gateway selection routing** in `isl-pathfinder.ts`.
 
-Planned stations are rendered with reduced opacity. Both planned and PoP entries are **excluded from gateway selection routing** in `isl-pathfinder.ts`. Fallback data is embedded in `src/lib/satellites/ground-stations.ts` (auto-synced via `scripts/sync-fallback.ts`).
+The offline update script (`npm run update-gs`) reconciles data from multiple sources (starlinkinsider.com, starlink.sx, PoP list) and writes to `data/ground-stations.json` as a backup. Runtime loading uses HF exclusively.
 
-**Auto-update workflow** (`.github/workflows/update-ground-stations.yml`): runs weekly Monday 06:00 UTC, fetches from all sources, reconciles (name normalization, coordinate dedup within 5km, status merge, sanity checks), syncs fallback, runs tests, and opens a PR if data changed. Uses `data/ground-stations-meta.json` for `lastSeen` tracking (gitignored).
+**Auto-update workflow** (`.github/workflows/update-ground-stations.yml`): runs weekly Monday 06:00 UTC, fetches from all sources, reconciles (name normalization, coordinate dedup within 5km, status merge, sanity checks), runs tests, and opens a PR if data changed. Uses `data/ground-stations-meta.json` for `lastSeen` tracking (gitignored).
+
+### Fleet Monitor (`/fleet`)
+
+Separate page tracking Starlink constellation health over time using NORAD TLE data.
+
+- **Database**: `data/fleet.db` (SQLite, gitignored) — `tle_snapshots` (per-satellite per-epoch) and `daily_snapshots` (materialized daily aggregates per shell)
+- **Ingestion**: `npm run ingest` fetches from CelesTrak, propagates via SGP4, classifies status, persists to SQLite
+- **Status classification** (`src/lib/fleet/classify.ts`) — sliding window of 3+ TLE epochs: `operational`, `raising`, `deorbiting`, `decayed`, `anomalous`, `unknown`
+- **API routes**: `/api/fleet/{growth,shells,altitudes,launches,satellite/[noradId],planes}`
+- **Charts** (`src/components/fleet/`) — 7 recharts panels: Constellation Growth, Altitude Distribution, Shell Fill Rate, Launch Cadence, Satellite Lifecycle, Orbital Planes (RAAN with J2 correction), ISL Coverage
+- **RAAN correction** (`src/lib/fleet/raan-correction.ts`) — J2 precession correction to common reference epoch for orbital plane analysis
+- **Shell targets** (`SHELL_TARGETS` in `config.ts`) — FCC-authorized constellation sizes per shell
+- **Filtering**: Only `STARLINK-\d+` names ingested (rejects Starshield, debris, TBA objects)
 
 ### Sky View Utilities
 

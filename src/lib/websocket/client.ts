@@ -132,8 +132,8 @@ export function useWebSocket(): UseWebSocketReturn {
       reconnectTimeoutRef.current = setTimeout(connect, delay);
     };
 
-    ws.onerror = (err) => {
-      console.error('[WS] Error:', err);
+    ws.onerror = () => {
+      console.warn('[WS] Connection error — server may not be running (use `npm run dev` for full backend)');
     };
 
     ws.onmessage = handleMessage;

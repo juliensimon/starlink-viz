@@ -69,18 +69,27 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function computeRTTArray(): number[] {
+  return GROUND_STATIONS.map((gs) => {
+    let minDist = Infinity;
+    for (const ixp of MAJOR_IXPS) {
+      const d = haversineKm(gs.lat, gs.lon, ixp.lat, ixp.lon);
+      if (d < minDist) minDist = d;
+    }
+    const fiberKm = minDist * FIBER_ROUTE_FACTOR;
+    const oneWayMs = (fiberKm / FIBER_SPEED_KM_S) * 1000 + ROUTER_PROCESSING_MS;
+    return oneWayMs * 2; // RTT
+  });
+}
+
 /**
  * Pre-computed RTT backhaul latency (ms) for each ground station.
- * Index matches GROUND_STATIONS array.
+ * Index matches GROUND_STATIONS array. Updated by recomputeBackhaulRTT().
  */
-export const GS_BACKHAUL_RTT_MS: number[] = GROUND_STATIONS.map((gs) => {
-  let minDist = Infinity;
-  for (const ixp of MAJOR_IXPS) {
-    const d = haversineKm(gs.lat, gs.lon, ixp.lat, ixp.lon);
-    if (d < minDist) minDist = d;
-  }
+export let GS_BACKHAUL_RTT_MS: number[] = computeRTTArray();
 
-  const fiberKm = minDist * FIBER_ROUTE_FACTOR;
-  const oneWayMs = (fiberKm / FIBER_SPEED_KM_S) * 1000 + ROUTER_PROCESSING_MS;
-  return oneWayMs * 2; // RTT
-});
+/** Rebuild GS_BACKHAUL_RTT_MS from the current GROUND_STATIONS array.
+ *  Called by refreshGroundStations() after updating the station list. */
+export function recomputeBackhaulRTT(): void {
+  GS_BACKHAUL_RTT_MS = computeRTTArray();
+}

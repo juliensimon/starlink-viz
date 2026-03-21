@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
-import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
+import { GROUND_STATIONS, refreshGroundStations } from '@/lib/satellites/ground-stations';
+
+let initialized = false;
 
 export async function GET() {
-  return NextResponse.json({
+  if (!initialized) {
+    await refreshGroundStations();
+    initialized = true;
+  }
+
+  return Response.json({
     count: GROUND_STATIONS.length,
     stations: GROUND_STATIONS,
   });
