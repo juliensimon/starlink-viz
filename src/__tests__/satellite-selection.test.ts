@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
 import { geodeticToCartesian } from '../lib/utils/coordinates';
 import { computeGeometricLatency } from '../lib/utils/geometric-latency';
-import { GROUND_STATIONS } from '../lib/satellites/ground-stations';
+import { GROUND_STATIONS, refreshGroundStations } from '../lib/satellites/ground-stations';
 import { DISH_POS } from '../lib/utils/dish-frame';
 
 /**
@@ -17,11 +17,16 @@ function degToRad(deg: number): number {
 
 const dishVec = { x: DISH_POS.x, y: DISH_POS.y, z: DISH_POS.z };
 
-// Precompute GS positions (mirrors ConnectionBeam.tsx)
-const gsPositions = GROUND_STATIONS.map((gs) => {
-  const { x, y, z } = geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
-  return { x, y, z };
-});
+// Computed after HF data loads
+let gsPositions: { x: number; y: number; z: number }[] = [];
+
+beforeAll(async () => {
+  await refreshGroundStations();
+  gsPositions = GROUND_STATIONS.map((gs) => {
+    const { x, y, z } = geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
+    return { x, y, z };
+  });
+}, 15_000);
 
 // Mirror the totalPathLength helper from ConnectionBeam.tsx
 function totalPathLength(x: number, y: number, z: number): number {

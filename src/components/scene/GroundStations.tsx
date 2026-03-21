@@ -1,22 +1,32 @@
 'use client';
 
-import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { geodeticToCartesian } from '@/lib/utils/coordinates';
-import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
+import { GROUND_STATIONS, groundStationsVersion, refreshGroundStations } from '@/lib/satellites/ground-stations';
 
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
-const stationPositions = GROUND_STATIONS.map((gs) => {
-  const { x, y, z } = geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
-  return new THREE.Vector3(x, y, z);
-});
+// Lazily computed — rebuilt when groundStationsVersion changes
+let stationPositions: THREE.Vector3[] = [];
+let gsPositionsVersion = -1;
+
+function ensureStationPositions(): THREE.Vector3[] {
+  if (gsPositionsVersion !== groundStationsVersion) {
+    stationPositions = GROUND_STATIONS.map((gs) => {
+      const { x, y, z } = geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
+      return new THREE.Vector3(x, y, z);
+    });
+    gsPositionsVersion = groundStationsVersion;
+  }
+  return stationPositions;
+}
 
 export function getGroundStationPosition(index: number): THREE.Vector3 {
-  return stationPositions[index];
+  return ensureStationPositions()[index];
 }
 
 function dispatchGSTooltip(data: { name: string; lat: number; lon: number; status?: string; x: number; y: number } | null) {
@@ -40,7 +50,15 @@ function createStarGeometry(outerRadius: number, innerRadius: number, points: nu
 
 export default function GroundStations() {
   const { camera, gl } = useThree();
+  const [gsVersion, setGsVersion] = useState(groundStationsVersion);
   const geometry = useMemo(() => createStarGeometry(0.007, 0.003, 4), []);
+
+  // Load ground stations from API on mount (client-side)
+  useEffect(() => {
+    if (GROUND_STATIONS.length === 0) {
+      refreshGroundStations().then(() => setGsVersion(groundStationsVersion));
+    }
+  }, []);
   const operationalMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff9933'), side: THREE.DoubleSide }),
     []
@@ -97,7 +115,8 @@ export default function GroundStations() {
       if (idx >= 0 && idx !== lastHitRef.current) {
         lastHitRef.current = idx;
         const gs = GROUND_STATIONS[idx];
-        const pos3d = stationPositions[idx].clone().project(camera);
+        const positions = ensureStationPositions();
+        const pos3d = positions[idx].clone().project(camera);
         const rect = gl.domElement.getBoundingClientRect();
         dispatchGSTooltip({
           name: gs.name,
@@ -116,7 +135,7 @@ export default function GroundStations() {
 
   return (
     <group>
-      {stationPositions.map((pos, i) => (
+      {ensureStationPositions().map((pos, i) => (
         <mesh
           key={i}
           ref={(el) => { if (el) meshesRef.current[i] = el; }}
