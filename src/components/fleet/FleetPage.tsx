@@ -127,7 +127,7 @@ export function FleetPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
           {lastIngest && <span>Last: {new Date(lastIngest).toLocaleDateString()}</span>}
-          <span>{recordCount.toLocaleString()} snapshots</span>
+          <span>{recordCount.toLocaleString()} days</span>
           {refreshMsg && (
             <span style={{ color: refreshMsg.startsWith('Failed') ? '#f87171' : '#fbbf24', fontSize: 10 }}>
               {refreshMsg}
