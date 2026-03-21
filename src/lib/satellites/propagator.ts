@@ -38,6 +38,29 @@ export function propagateSingle(satrec: SatRec, date: Date): SatelliteOrbitalDat
 }
 
 /**
+ * Propagate a single satellite and return its 3D scene position.
+ */
+export function propagatePosition(satrec: SatRec, date: Date): { x: number; y: number; z: number } | null {
+  try {
+    const result = satellite.propagate(satrec, date);
+    if (!result || !result.position || typeof result.position === 'boolean') return null;
+    const posEci = result.position as satellite.EciVec3<number>;
+    if (isNaN(posEci.x)) return null;
+    const gmst = satellite.gstime(date);
+    const gd = satellite.eciToGeodetic(posEci, gmst);
+    if (isNaN(gd.latitude)) return null;
+    const radius = 1 + gd.height / 6371;
+    return {
+      x: radius * Math.cos(gd.latitude) * Math.cos(gd.longitude),
+      y: radius * Math.sin(gd.latitude),
+      z: -radius * Math.cos(gd.latitude) * Math.sin(gd.longitude),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Initialize satellite records from TLE data.
  * Returns array of satrec objects (some may be invalid).
  */

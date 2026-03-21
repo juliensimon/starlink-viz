@@ -37,6 +37,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.183.1",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.0"

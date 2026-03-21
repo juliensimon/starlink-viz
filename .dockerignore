@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.worktrees
+.superpowers
+.playwright-mcp
+*.md
+!README.md
+.env*
+isl-route.log
+data/fleet.db*
+data/last-celestrak-response.json
+docs/

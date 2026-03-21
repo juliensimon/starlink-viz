@@ -42,8 +42,12 @@ yarn-error.log*
 # superpowers
 .superpowers/
 
-# screenshots
+# worktrees
+.worktrees/
+
+# screenshots (except docs/ and public/textures/)
 *.png
+!docs/*.png
 !public/textures/*.png
 
 # typescript
@@ -60,3 +64,7 @@ data/tle-archive/
 data/satcat/
 data/launch-log/
 data/bulk/
+
+# ground station update artifacts
+data/ground-stations-update-report.md
+data/ground-stations-meta.json

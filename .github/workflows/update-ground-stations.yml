@@ -1,0 +1,59 @@
+name: Update Ground Stations
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-ground-stations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run update script
+        run: npx tsx scripts/update-ground-stations.ts
+
+      - name: Sync fallback data
+        run: npx tsx scripts/sync-fallback.ts
+
+      - name: Run tests
+        run: npm test
+        env:
+          DEMO_MODE: 'true'
+
+      - name: Read update report
+        id: report
+        run: |
+          if [ -f data/ground-stations-update-report.md ]; then
+            {
+              echo 'body<<EOF'
+              cat data/ground-stations-update-report.md
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo 'body=Automated ground station data update.' >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: auto/update-ground-stations
+          title: 'chore: update ground station data'
+          body: ${{ steps.report.outputs.body }}
+          commit-message: 'chore: update ground station data [automated]'
+          delete-branch: true
+          labels: automated
