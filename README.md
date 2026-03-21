@@ -21,7 +21,7 @@ Real-time 3D Starlink satellite tracker and mission control dashboard. Track eve
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![satellite.js](https://img.shields.io/badge/SGP4-satellite.js-orange)
 ![Satellites](https://img.shields.io/badge/satellites-~10%2C000-blueviolet)
-![Ground Stations](https://img.shields.io/badge/gateways-204-ff9933)
+![Ground Stations](https://img.shields.io/badge/gateways-HF_dataset-ff9933)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ### Space View
@@ -39,7 +39,7 @@ Real-time 3D Starlink satellite tracker and mission control dashboard. Track eve
 - **Live dish telemetry** from a real Starlink dish via gRPC (or demo mode with simulated data)
 - **Astronomically accurate Sun and Moon** with real-time positioning, lens flare, and natural lunar phases
 - **Satellite handoff tracking** — monitors when your dish switches between satellites
-- **204 ground stations** from FCC/international filings, with operational/planned status
+- **Ground stations** from FCC/international filings (loaded from [HF dataset](https://huggingface.co/datasets/juliensimon/starlink-ground-stations)), with operational/planned status
 - **ISL routing prediction** — models inter-satellite laser links with PoP-constrained gateway selection, line-of-sight checks, and per-gateway backhaul estimation
 - **Connection beam** visualization from dish to connected satellite (cyan uplink, green ISL hops, orange downlink)
 - **Demo locations** — 5 remote locations (Iceland Gap, Atlantic, Gulf of Mexico, Celtic Sea) where ISL routing is mandatory
@@ -191,9 +191,8 @@ The `/fleet` page tracks Starlink constellation health over time using historica
 
 The complete dataset is published on Hugging Face: **[juliensimon/starlink-fleet-data](https://huggingface.co/datasets/juliensimon/starlink-fleet-data)**
 
-- **21.4M TLE snapshots** across 10,565 satellites (May 2019 → present)
-- **2,418 days** of continuous orbital element history
-- **3 tables**: per-satellite TLE snapshots, daily per-shell aggregates, latest satellite state
+- **Daily constellation snapshots** tracking every Starlink satellite (May 2019 → present)
+- Per-shell daily aggregates: satellite counts by status (operational, raising, deorbiting, decayed, anomalous)
 - Available as Parquet files for direct use with `datasets`, pandas, or DuckDB
 
 ## Documentation
