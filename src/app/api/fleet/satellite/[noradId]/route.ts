@@ -8,7 +8,7 @@ export async function GET(
     const { noradId } = await params;
     const data = await getSatelliteHistory(parseInt(noradId));
     return Response.json(data);
-  } catch {
+  } catch (err) { console.error("[fleet]", err);
     return Response.json([]);
   }
 }

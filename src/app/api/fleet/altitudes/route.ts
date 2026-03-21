@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const date = request.nextUrl.searchParams.get('date') || undefined;
     const data = await getAltitudeData(date);
     return Response.json(data);
-  } catch {
+  } catch (err) { console.error("[fleet]", err);
     return Response.json([]);
   }
 }

@@ -16,11 +16,13 @@ import { FleetTooltip } from '../FleetTooltip';
 const STATUS_COLORS: Record<string, string> = {
   operational: '#4ade80',
   raising: '#fbbf24',
+  deorbiting: '#fb923c',
   unknown: '#94a3b8',
   decayed: '#f87171',
+  anomalous: '#e879f9',
 };
 
-const STATUSES = ['operational', 'raising', 'unknown', 'decayed'];
+const STATUSES = ['operational', 'raising', 'deorbiting', 'unknown', 'decayed', 'anomalous'];
 
 interface RawRow {
   launch_year: number;
@@ -32,8 +34,10 @@ interface PivotedRow {
   year: string;
   operational: number;
   raising: number;
+  deorbiting: number;
   unknown: number;
   decayed: number;
+  anomalous: number;
 }
 
 function pivotData(rows: RawRow[]): PivotedRow[] {
@@ -45,8 +49,10 @@ function pivotData(rows: RawRow[]): PivotedRow[] {
         year: String(row.launch_year),
         operational: 0,
         raising: 0,
+        deorbiting: 0,
         unknown: 0,
         decayed: 0,
+        anomalous: 0,
       });
     }
     const entry = byYear.get(row.launch_year)!;

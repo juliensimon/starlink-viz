@@ -62,6 +62,21 @@ async function query<T>(sql: string): Promise<T[]> {
   }
 }
 
+// ── Input validation ───────────────────────────────────────────────────
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}/;
+
+function validateDate(d: string | undefined): string | undefined {
+  if (!d) return undefined;
+  if (!ISO_DATE_RE.test(d)) return undefined;
+  return d.slice(0, 10); // only keep YYYY-MM-DD
+}
+
+function sanitizeSearchQuery(q: string): string {
+  // Strip everything except alphanumeric, dash, space
+  return q.replace(/[^a-zA-Z0-9\- ]/g, '').slice(0, 50);
+}
+
 // ── Public API ─────────────────────────────────────────────────────────
 
 /** Clear DuckDB connection — forces fresh reads on next query */
@@ -99,9 +114,11 @@ export async function getShellsSummary() {
 export async function getGrowthData(from?: string, to?: string) {
   if (!existsSync(DAILY_PATH)) return [];
 
+  const safeFrom = validateDate(from);
+  const safeTo = validateDate(to);
   const where: string[] = [];
-  if (from) where.push(`date >= '${from}'`);
-  if (to) where.push(`date <= '${to}'`);
+  if (safeFrom) where.push(`date >= '${safeFrom}'`);
+  if (safeTo) where.push(`date <= '${safeTo}'`);
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
   return query(`
@@ -116,9 +133,11 @@ export async function getGrowthData(from?: string, to?: string) {
 export async function getLaunchData(from?: string, to?: string) {
   if (!existsSync(DAILY_PATH)) return [];
 
+  const safeFrom = validateDate(from);
+  const safeTo = validateDate(to);
   const where: string[] = [];
-  if (from) where.push(`date >= '${from}'`);
-  if (to) where.push(`date <= '${to}'`);
+  if (safeFrom) where.push(`date >= '${safeFrom}'`);
+  if (safeTo) where.push(`date <= '${safeTo}'`);
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
   return query(`
@@ -202,11 +221,13 @@ export async function getVintageData() {
 
 export async function searchSatellites(q: string, limit = 20) {
   if (!existsSync(LATEST_PATH)) return [];
-  // Search by name (STARLINK-1234) or NORAD ID
-  const isNumeric = /^\d+$/.test(q);
+  const safe = sanitizeSearchQuery(q);
+  if (safe.length < 2) return [];
+
+  const isNumeric = /^\d+$/.test(safe);
   const where = isNumeric
-    ? `norad_id = ${parseInt(q)}`
-    : `name ILIKE '%${q.replace(/'/g, "''")}%'`;
+    ? `norad_id = ${parseInt(safe)}`
+    : `name ILIKE '%${safe}%'`;
   return query(`
     SELECT norad_id, name, status, altitude_km, shell_id, launch_year
     FROM read_parquet('${LATEST_PATH}')
