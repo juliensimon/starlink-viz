@@ -34,8 +34,6 @@ interface KpiData {
   islCapable: number;
   raising: number;
   deorbiting: number;
-  decayed: number;
-  launched2026: number;
 }
 
 export function FleetPage() {
@@ -67,24 +65,62 @@ export function FleetPage() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setRefreshMsg('Downloading from HF...');
-    fetch('/api/fleet/refresh', { method: 'POST' })
-      .then((r) => r.json())
-      .then((data: { ok: boolean; message: string }) => {
-        if (data.ok) {
-          setRefreshMsg('Reloading charts...');
-          setRefreshKey((k) => k + 1);
-          setTimeout(() => setRefreshMsg(''), 2000);
-        } else {
-          setRefreshMsg(`Failed: ${data.message}`);
-          setTimeout(() => setRefreshMsg(''), 5000);
-        }
-      })
-      .catch(() => {
-        setRefreshMsg('Network error');
+    setRefreshMsg('Connecting to HF...');
+
+    fetch('/api/fleet/refresh', { method: 'POST' }).then((res) => {
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setRefreshMsg('Failed: no response stream');
+        setRefreshing(false);
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      function pump(): Promise<void> {
+        return reader!.read().then(({ done, value }) => {
+          if (done) {
+            setRefreshing(false);
+            return;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          let event = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              event = line.slice(7);
+            } else if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (event === 'progress') {
+                setRefreshMsg(data);
+              } else if (event === 'done') {
+                setRefreshMsg('Reloading charts...');
+                setRefreshKey((k) => k + 1);
+                setTimeout(() => setRefreshMsg(''), 2000);
+              } else if (event === 'error') {
+                setRefreshMsg(`Failed: ${data}`);
+                setTimeout(() => setRefreshMsg(''), 5000);
+              }
+            }
+          }
+          return pump();
+        });
+      }
+
+      pump().catch(() => {
+        setRefreshMsg('Connection lost');
         setTimeout(() => setRefreshMsg(''), 5000);
-      })
-      .finally(() => setRefreshing(false));
+        setRefreshing(false);
+      });
+    }).catch(() => {
+      setRefreshMsg('Network error');
+      setTimeout(() => setRefreshMsg(''), 5000);
+      setRefreshing(false);
+    });
   };
 
   // Fallback KPIs from shell data if /api/fleet/kpis hasn't loaded yet
@@ -96,10 +132,8 @@ export function FleetPage() {
           islCapable: acc.islCapable + s.isl_operational_count,
           raising: acc.raising + s.raising_count,
           deorbiting: acc.deorbiting + s.deorbiting_count,
-          decayed: 0,
-          launched2026: 0,
         }),
-        { total: 0, operational: 0, islCapable: 0, raising: 0, deorbiting: 0, decayed: 0, launched2026: 0 },
+        { total: 0, operational: 0, islCapable: 0, raising: 0, deorbiting: 0 },
       )
     : null);
 

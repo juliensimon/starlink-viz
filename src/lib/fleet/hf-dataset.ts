@@ -45,13 +45,20 @@ async function query<T>(sql: string): Promise<T[]> {
         const obj: Record<string, unknown> = {};
         for (let i = 0; i < names.length; i++) {
           let val = row[i];
-          // Convert BigInt to number
-          if (typeof val === 'bigint') obj[names[i]] = Number(val);
+          // Convert BigInt to number (DuckDB returns BIGINT for COUNT/SUM)
+          if (typeof val === 'bigint') val = Number(val);
           // Convert DuckDB timestamp objects to ISO string
-          else if (val && typeof val === 'object' && 'nanos' in val) {
-            obj[names[i]] = new Date(Number((val as { nanos: bigint }).nanos / BigInt(1000000))).toISOString();
+          else if (val && typeof val === 'object' && 'micros' in val) {
+            val = new Date(Number(BigInt((val as { micros: bigint }).micros) / BigInt(1000))).toISOString();
           }
-          else obj[names[i]] = val;
+          else if (val && typeof val === 'object' && 'nanos' in val) {
+            val = new Date(Number(BigInt((val as { nanos: bigint }).nanos) / BigInt(1000000))).toISOString();
+          }
+          // Convert any nested BigInts (e.g. in structs)
+          else if (val && typeof val === 'object') {
+            val = JSON.parse(JSON.stringify(val, (_, v) => typeof v === 'bigint' ? Number(v) : v));
+          }
+          obj[names[i]] = val;
         }
         rows.push(obj as T);
       }
@@ -176,34 +183,21 @@ export async function getKpis() {
     total: 0, operational: 0, islCapable: 0, raising: 0, deorbiting: 0, decayed: 0, launched2026: 0,
   };
 
-  if (existsSync(DAILY_PATH)) {
-    const rows = await query<Record<string, number>>(`
-      WITH latest AS (SELECT MAX(date) as d FROM read_parquet('${DAILY_PATH}'))
-      SELECT SUM(total_count) as total, SUM(operational_count) as operational,
-             SUM(isl_operational_count) as isl_capable,
-             SUM(raising_count) as raising, SUM(deorbiting_count) as deorbiting
-      FROM read_parquet('${DAILY_PATH}') WHERE date = (SELECT d FROM latest)
-    `);
-    if (rows[0]) {
-      result.total = rows[0].total ?? 0;
-      result.operational = rows[0].operational ?? 0;
-      result.islCapable = rows[0].isl_capable ?? 0;
-      result.raising = rows[0].raising ?? 0;
-      result.deorbiting = rows[0].deorbiting ?? 0;
-    }
-  }
+  if (!existsSync(DAILY_PATH)) return result;
 
-  if (existsSync(LATEST_PATH)) {
-    const rows = await query<Record<string, number>>(`
-      SELECT
-        SUM(CASE WHEN status = 'decayed' THEN 1 ELSE 0 END) as decayed,
-        SUM(CASE WHEN launch_year = 2026 THEN 1 ELSE 0 END) as launched_2026
-      FROM read_parquet('${LATEST_PATH}')
-    `);
-    if (rows[0]) {
-      result.decayed = rows[0].decayed ?? 0;
-      result.launched2026 = rows[0].launched_2026 ?? 0;
-    }
+  const rows = await query<Record<string, number>>(`
+    WITH latest AS (SELECT MAX(date) as d FROM read_parquet('${DAILY_PATH}'))
+    SELECT SUM(total_count) as total, SUM(operational_count) as operational,
+           SUM(isl_operational_count) as isl_capable,
+           SUM(raising_count) as raising, SUM(deorbiting_count) as deorbiting
+    FROM read_parquet('${DAILY_PATH}') WHERE date = (SELECT d FROM latest)
+  `);
+  if (rows[0]) {
+    result.total = rows[0].total ?? 0;
+    result.operational = rows[0].operational ?? 0;
+    result.islCapable = rows[0].isl_capable ?? 0;
+    result.raising = rows[0].raising ?? 0;
+    result.deorbiting = rows[0].deorbiting ?? 0;
   }
 
   return result;
