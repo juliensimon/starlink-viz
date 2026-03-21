@@ -16,6 +16,9 @@
 | **System traceroute / DNS**  | Local network | Network path analysis — which internet exit point your traffic uses                            | Standard network utilities                                                                        |
 | **FCC / ITU filings**        | Public        | Ground station locations (cross-referenced with community research)                            | [FCC IBFS via fcc.report](https://fcc.report); [ARCEP](https://www.arcep.fr); [Ofcom](https://www.ofcom.org.uk) |
 | **Starlink DNS conventions** | Observed      | PoP code mappings (e.g., `customer.frntdeu.pop.starlinkisp.net` → Frankfurt)                   | Community-documented patterns                                                                     |
+| **starlink.sx**              | Community     | Gateway locations with coordinates, antenna counts, Ka/E-band status                           | [starlink.sx/gateways.json](https://starlink.sx/gateways.json)                                   |
+| **Starlink Insider**         | Community     | Curated gateway list with operational status                                                    | [starlinkinsider.com](https://starlinkinsider.com/starlink-gateway-locations/)                    |
+| **starlink-geoip-data**      | Community     | PoP city list derived from Starlink rDNS records                                               | [GitHub: clarkzjw/starlink-geoip-data](https://github.com/clarkzjw/starlink-geoip-data)          |
 
 
 ### What the app does NOT have access to
@@ -191,24 +194,27 @@ This is a heuristic with known limitations:
 - [FCC DA 26-36 — Gen2 Upgrade Authorization (Jan 2026)](https://docs.fcc.gov/public/attachments/DA-26-36A1.pdf)
 - [Jonathan McDowell — Starlink Statistics](https://planet4589.org/space/con/star/stats.html)
 
-### 6. Ground Station Locations — Partially Verified ⚠️
+### 6. Ground Station & PoP Locations — Partially Verified ⚠️
 
-**Data source:** Regulatory filings and community research.
+**Data source:** Multi-source: community databases, regulatory filings, and Starlink rDNS records.
 
-**Implementation:** `data/ground-stations.json` — 204 gateway locations worldwide (168 operational, 36 planned), loaded by `src/lib/satellites/ground-stations.ts` with a hardcoded fallback copy. Operational station positions are precomputed as 3D vectors in `ConnectionBeam.tsx` for nearest-neighbor lookups; planned stations are rendered but excluded from routing.
+**Implementation:** `data/ground-stations.json` — 357 locations (307 gateways + 50 PoPs) with `type` (`'gateway'` | `'pop'`) and `status` (`'operational'` | `'planned'`) fields. Loaded by `src/lib/satellites/ground-stations.ts` with an auto-synced embedded fallback. Operational gateway positions are used for nearest-neighbor lookups in routing; planned stations and PoPs are rendered but excluded from gateway selection routing in `isl-pathfinder.ts`.
 
-The app's database contains **204 gateways** (168 operational, 36 planned/under construction) spanning North America, Europe, Asia-Pacific, South America/Caribbean, and Africa/Middle East. Locations are sourced from regulatory filings, community research, and curated aggregations. Planned stations are shown with reduced opacity and excluded from gateway selection routing.
+The app's database contains **307 gateways** (214 operational, 93 planned) and **50 PoPs** (35 operational, 15 planned) spanning all continents. A **weekly automated update** (`.github/workflows/update-ground-stations.yml`) fetches from all sources, reconciles data (name normalization, coordinate dedup within 5km, status merge, sanity checks), syncs the embedded fallback, and opens a PR if data changed.
 
 **Why "partially verified":**
 
 - SpaceX doesn't publish an official station list
 - Some sites may be planned but not yet built; some operational sites may still be missing
 - The app has no idea whether a gateway is currently online, overloaded, or down for maintenance; it treats all operational stations as equally available
+- PoP classification relies on Starlink rDNS naming conventions which may change
 
-**Authoritative sources for ground stations:**
-- **US gateways:** [FCC IBFS (International Bureau Filing System)](https://fcc.report) — SpaceX is required to file Earth Station applications for every US gateway. Search for SpaceX earth station authorizations. This is the primary source used by analysts like Nathan Owens (Netflix CDN engineer who tracks Starlink infrastructure closely)
-- **International gateways:** Filed with each country's telecom regulator — [ARCEP](https://www.arcep.fr) (France), [Ofcom](https://www.ofcom.org.uk) (UK), [ACMA](https://www.acma.gov.au) (Australia), Chile's telecommunications ministry, [Radio Spectrum Management](https://www.rsm.govt.nz) (New Zealand), among others
-- **Curated aggregations:** [Starlink Insider gateway map](https://starlinkinsider.com/starlink-gateway-locations/) (~150 operational gateways); community-maintained Google Map compiled from FCC data via Reddit
+**Data sources for ground stations:**
+- **[starlink.sx](https://starlink.sx/gateways.json)** — primary structured source with coordinates, antenna counts, Ka/E-band operational status per gateway (~350 entries). Credit: starlink.sx community
+- **[Starlink Insider](https://starlinkinsider.com/starlink-gateway-locations/)** — curated gateway list with operational/construction status. Credit: Starlink Insider community
+- **[starlink-geoip-data](https://github.com/clarkzjw/starlink-geoip-data)** — PoP city list (52 cities) derived from Starlink rDNS records (`customer.<pop-id>.pop.starlinkisp.net`)
+- **US gateways:** [FCC IBFS (International Bureau Filing System)](https://fcc.report) — SpaceX is required to file Earth Station applications for every US gateway
+- **International gateways:** Filed with each country's telecom regulator — [ARCEP](https://www.arcep.fr) (France), [Ofcom](https://www.ofcom.org.uk) (UK), [ACMA](https://www.acma.gov.au) (Australia), among others
 - **US filing count:** [Data Center Dynamics reporting on SpaceX FCC applications](https://www.datacenterdynamics.com)
 
 ### 7. PoP Identification — Verified ✓ (Live Mode Only)
@@ -431,6 +437,91 @@ This is clearly art, not a technical claim.
 
 ---
 
+## Sky View — Observer's Night Sky
+
+The sky view renders the night sky as seen from the dish location, projecting Starlink satellites, reference stars, and constellations onto a virtual hemisphere dome.
+
+### 10. Observer Frame & Az/El Projection — Verified ✓
+
+**Data source:** Standard geodesy and spherical trigonometry.
+
+**Implementation:** `src/lib/utils/observer-frame.ts` — `computeObserverFrame()` constructs an ENU (East-North-Up) frame from the observer's latitude/longitude. `computeAzElFrom()` projects any 3D point into azimuth/elevation. `azElToDirection3D()` performs the inverse transform. Roundtrip accuracy is confirmed by tests.
+
+The sky view reuses the same ENU math as `dish-frame.ts` (used by ConnectionBeam for satellite selection), but parameterized for any lat/lon — critical for demo location support. The frame construction uses cross(Y_up, normal) for the east vector, with a pole degeneracy guard (cross product magnitude < 1e-10) that falls back to the X-axis when the observer is essentially at a geographic pole.
+
+**Accuracy:** Exact — same math used by antenna controllers worldwide. No approximation.
+
+### 11. Star Coordinate Transform (RA/Dec → Az/El) — Verified ✓
+
+**Data source:** Standard equatorial-to-horizontal coordinate transform.
+
+**Implementation:** `src/lib/utils/star-coordinates.ts` — converts J2000 Right Ascension / Declination to local Azimuth / Elevation using Greenwich Mean Sidereal Time from `satellite.gstime()`.
+
+The algorithm: GMST → Local Sidereal Time (LST = GMST + longitude) → Hour Angle (HA = LST - RA) → standard spherical trig for sin(elevation) and atan2(azimuth). This is the textbook transform used by every planetarium program.
+
+**Known limitation:** No J2000 precession correction. By 2026, accumulated precession is ~0.36° (26 years × 50.3″/year) — imperceptible at the rendering scale. Over decades this would start to matter.
+
+### 12. Star Catalog — Verified ✓
+
+**Data source:** Hipparcos / Yale Bright Star Catalog subset.
+
+**Implementation:** `src/data/bright-stars.ts` — ~500 stars down to magnitude 4.0 with J2000 RA/Dec, apparent magnitude, and B-V color index. Includes all major constellation vertices plus fill stars for visual density.
+
+Spot-checked against SIMBAD/Hipparcos: Sirius (RA 101.287°, Dec -16.716°), Polaris (RA 37.954°, Dec 89.264°), Betelgeuse (RA 88.793°, Dec 7.407°) — all match to within 0.01°.
+
+Star visual properties: size mapped from magnitude (`max(1, 4 - mag) * 0.02`), color from B-V index (blue-white for B-V < -0.1, through white, yellow, orange, to red for B-V > 1.0). Updates every 10 seconds — sidereal rotation moves stars at 15°/hour = 0.04°/10s, imperceptible at normal zoom.
+
+### 13. Constellation Data — Verified ✓ (with corrections applied)
+
+**Data source:** IAU constellation definitions.
+
+**Implementation:** `src/data/constellations.ts` — all 88 IAU constellations with stick-figure line segments defined as RA/Dec coordinate pairs, rendered as `THREE.LineSegments`.
+
+Spot-checked Orion (Betelgeuse, Rigel, belt stars — all correct to 0.01°), Ursa Major (Big Dipper — seven-star pattern correctly connected), Scorpius (Antares through tail — correct), Crux (four-star cross — correct).
+
+**Corrections applied after review:** Mirach (β And) RA/Dec was off by ~9°/20° (fixed to 17.433°, 35.621°); Caph (β Cas) RA was off by ~7° (fixed to 2.295°). Andromeda and Cassiopeia stick figures updated accordingly.
+
+### 14. Earth Shadow Model — Approximation ⚠️
+
+**Data source:** Cylindrical shadow geometry.
+
+**Implementation:** `src/lib/utils/sun-shadow.ts` — `isSatelliteSunlit()` tests whether a satellite is in Earth's shadow using a cylindrical approximation: project the satellite position onto the Earth-Sun axis; if on the night side, check if the perpendicular distance to the axis exceeds Earth's radius (1.0 in scene units).
+
+**Why cylindrical, not conical:** At Starlink altitude (~550 km), the penumbra width is approximately 5 km (Sun's angular radius ~0.265° → `550 km × tan(0.265°) ≈ 2.5 km` half-width). The conical umbra/penumbra model would add complexity for a difference invisible at rendering scale. The cylindrical model is standard for LEO satellite visibility prediction.
+
+**Boundary behavior:** The code compares the *squared* perpendicular distance against 1.0 (Earth's radius squared — an optimization that avoids a sqrt). Satellites exactly on the shadow cylinder wall (`perpDistSq = 1.0`) are treated as shadowed (conservative). In reality they'd be in partial penumbral shadow.
+
+**Usage:** SkySatellites applies the shadow model during periodic color updates (every 100ms). Sunlit satellites render at full shell color brightness; shadowed satellites render at 10% brightness. The SkyHud displays sunlit/shadow counts.
+
+### 15. Sun Direction & Sky Gradient — Approximation ⚠️
+
+**Data source:** Simplified ecliptic longitude model.
+
+**Implementation:** `src/lib/utils/astronomy.ts` — `getSunDirection()` computes sun position from day-of-year ecliptic longitude (`2π(dayOfYear - 80)/365`) with axial tilt rotation. `src/components/scene/sky/SkyEnvironment.tsx` — `computeSkyVertexColor()` maps sun elevation to sky colors.
+
+**Accuracy:** The ecliptic longitude model ignores the equation of center (orbital eccentricity), introducing up to ~2° error (~8 minutes of sunrise/sunset time). Additionally, `dayOfYear` is computed as an integer (`Math.floor`), adding up to ~1° of intra-day stale ecliptic longitude (the time-of-day rotation is applied separately). Combined error: up to ~3° in sun position. Acceptable for a satellite visibility indicator.
+
+**Sky gradient phases:**
+
+| Sun elevation | Phase | Sky appearance |
+|---------------|-------|----------------|
+| > 10° | Full day | Bright blue, brighter near horizon (Rayleigh scattering approximation) |
+| 0° to 10° | Low sun | Warm glow near sun azimuth at horizon |
+| -6° to 0° | Civil twilight | Deep blue with orange/pink horizon glow |
+| -12° to -6° | Nautical twilight | Dark blue, faint glow |
+| -18° to -12° | Astronomical twilight | Very dark, barely perceptible |
+| < -18° | Night | Near black |
+
+The gradient is azimuth-aware — vertices near the sun's azimuth get warmer colors during sunset/twilight, simulating the directional glow. Breakpoints match `computeSkyVertexColor()` in `SkyEnvironment.tsx`. This is a visual approximation, not a physically-based atmospheric scattering model.
+
+### 16. Satellite Trajectory on Hover — Verified ✓
+
+**Implementation:** `src/components/scene/sky/SkyTrajectory.tsx` — when a satellite is hovered in sky view, propagates its position ±5 minutes using `propagatePosition()` (SGP4) at 80 time steps, projects each position to az/el on the dome.
+
+This uses the same SGP4 propagation as the main satellite positions — just evaluated at different times. The trajectory is physically accurate within TLE precision (~1 km). Past trail renders in cyan, future in warm yellow, both fading toward the ends via vertex color intensity.
+
+---
+
 ## Summary: What's Real vs. What's Inferred
 
 
@@ -441,16 +532,22 @@ This is clearly art, not a technical claim.
 | **Globe, coordinates, geometry** | WGS-84 standard + textbook math              | **Real** — zero assumptions                                         |
 | **Dish stats (live mode)**       | Your dish's hardware API                     | **Real** — straight from the hardware                               |
 | **Network path (live mode)**     | Traceroute + DNS lookup                      | **Real** — actual network measurement                               |
-| **Ground station locations**     | Regulatory filings + research                | **Mostly real** — 204 gateways from FCC/intl filings; some may be missing |
+| **Ground station locations**     | Multi-source (starlink.sx + Starlink Insider + rDNS) | **Mostly real** — 307 gateways + 50 PoPs, auto-updated weekly; some may be missing |
 | **Antenna steering range (25°)** | Community observation + FCC filings          | **Educated guess** — real value is proprietary, varies by HW rev    |
 | **Which satellite you're on**    | Inferred from antenna + geometry             | **Probably right** — but no way to verify                           |
 | **Satellite selection logic**    | Boresight alignment + path-length tiebreaker | **Simplified** — real logic involves fleet-wide optimization        |
-| **Gateway assignment**           | Nearest of 204 stations with 5% hysteresis   | **Simplified** — real routing is dynamic, weather-aware, ISL-routed |
+| **Gateway assignment**           | Nearest of 307 gateways with 5% hysteresis   | **Simplified** — real routing is dynamic, weather-aware, ISL-routed |
 | **Handoff triggers**             | Elevation/boresight threshold                | **Simplified** — real triggers are centrally scheduled per-beam     |
 | **Demo ping latency**            | Speed-of-light calculation from geometry     | **Physics-based** — correct propagation delay, estimated processing |
 | **Demo throughput/SNR**          | Procedural sine waves                        | **Fake** — realistic-looking ranges, no physics                     |
 | **Laser inter-satellite links**  | Not shown                                    | **Missing** — no public data exists                                 |
 | **RF link budget**               | Not computed                                 | **Missing** — would require proprietary antenna specs               |
+| **Sky view az/el projection**    | ENU frame + spherical trig                   | **Real** — same math as antenna controllers                         |
+| **Star positions**               | J2000 RA/Dec via GMST transform              | **Real** — standard astronomy, ~0.36° precession drift by 2026     |
+| **Constellation patterns**       | IAU stick figures, spot-checked               | **Real** — all 88 IAU constellations, coordinates verified          |
+| **Satellite sun/shadow**         | Cylindrical Earth shadow model               | **Approximation** — ignores ~40 km penumbra (negligible at LEO)    |
+| **Sky gradient colors**          | Sun elevation phases                         | **Approximation** — visual, not physically-based scattering        |
+| **Trajectory arcs**              | SGP4 propagation ±5 min                      | **Real** — same propagator, accurate within TLE precision           |
 
 
 ---

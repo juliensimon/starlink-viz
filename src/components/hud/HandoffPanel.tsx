@@ -40,9 +40,11 @@ function shellIndex(inc: number): number {
 }
 
 function getGSCounts() {
-  const operational = GROUND_STATIONS.filter((gs) => gs.status !== 'planned').length;
-  const planned = GROUND_STATIONS.filter((gs) => gs.status === 'planned').length;
-  return { operational, planned };
+  const gateways = GROUND_STATIONS.filter((gs) => gs.type !== 'pop');
+  const operational = gateways.filter((gs) => gs.status !== 'planned').length;
+  const planned = gateways.filter((gs) => gs.status === 'planned').length;
+  const pops = GROUND_STATIONS.filter((gs) => gs.type === 'pop').length;
+  return { operational, planned, pops };
 }
 
 function formatTleAge(timestamp: number | null): string {
@@ -221,6 +223,13 @@ export default function HandoffPanel() {
               <span className="text-white/30">{getGSCounts().planned} planned</span>
             </>
           )}
+        </span>
+      </div>
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-[10px] text-white/50">PoPs</span>
+        <span className="text-[10px] tabular-nums text-white/60">
+          <span style={{ color: '#66ccff' }}>{getGSCounts().pops}</span>
+          <span className="text-white/30"> cities</span>
         </span>
       </div>
 

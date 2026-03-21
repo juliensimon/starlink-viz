@@ -8,6 +8,7 @@ import HandoffPanel from './HandoffPanel';
 import EventLog from './EventLog';
 import ViewControls from './ViewControls';
 import ColorLegend from './ColorLegend';
+import SkyHud from './SkyHud';
 
 export default function HudContainer() {
 
@@ -62,6 +63,11 @@ export default function HudContainer() {
         {/* Bottom-right: Color legend (hidden on small screens) */}
         <div className="hidden md:block absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-auto">
           <ColorLegend />
+        </div>
+
+        {/* Bottom-left: Sky view HUD (only visible in sky mode) */}
+        <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 pointer-events-auto">
+          <SkyHud />
         </div>
 
         {/* Bottom-center: Event log (hidden on small screens) */}

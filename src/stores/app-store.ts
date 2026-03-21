@@ -29,20 +29,23 @@ interface AppState {
   viewState: 'default' | 'tracking';
   demoMode: boolean;
   satellitesLoaded: boolean;
+  satellitesVersion: number; // incremented when propagator reinitializes data
   autoRotate: boolean;
   focusDishRequested: number; // increment to trigger focus
   tleLastFetched: number | null; // timestamp of last successful TLE fetch
   wsConnected: boolean;
-  altitudeFilter: boolean; // filter to operational altitude band (530-580 km)
+  altitudeFilter: boolean; // filter to per-shell operational altitude bands (see config.ts)
   hudVisible: boolean;
   islPrediction: boolean;
   demoLocation: DemoLocation | null;
+  cameraMode: 'space' | 'sky';
 
   setSelectedSatellite: (index: number | null) => void;
   setConnectedSatellite: (index: number | null) => void;
   setViewState: (state: 'default' | 'tracking') => void;
   setDemoMode: (enabled: boolean) => void;
   setSatellitesLoaded: (loaded: boolean) => void;
+  bumpSatellitesVersion: () => void;
   setAutoRotate: (enabled: boolean) => void;
   focusDish: () => void;
   setTleLastFetched: (timestamp: number) => void;
@@ -51,6 +54,7 @@ interface AppState {
   setHudVisible: (visible: boolean) => void;
   setISLPrediction: (enabled: boolean) => void;
   setDemoLocation: (location: DemoLocation | null) => void;
+  setCameraMode: (mode: 'space' | 'sky') => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -59,6 +63,7 @@ export const useAppStore = create<AppState>((set) => ({
   viewState: 'default',
   demoMode: false,
   satellitesLoaded: false,
+  satellitesVersion: 0,
   autoRotate: true,
   focusDishRequested: 0,
   tleLastFetched: null,
@@ -67,16 +72,21 @@ export const useAppStore = create<AppState>((set) => ({
   hudVisible: true,
   islPrediction: true,
   demoLocation: null,
+  cameraMode: 'space',
 
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
   setViewState: (state) => set({ viewState: state }),
-  setDemoMode: (enabled) => set({
+  setDemoMode: (enabled) => set((s) => ({
     demoMode: enabled,
-    // Set Iceland Gap when entering demo, clear when leaving
-    demoLocation: enabled ? DEMO_LOCATIONS[0] : null,
-  }),
+    // Set Iceland Gap only when first entering demo, clear when leaving.
+    // Don't reset if already in demo (preserves user's location choice).
+    demoLocation: enabled
+      ? (s.demoMode ? s.demoLocation : DEMO_LOCATIONS[0])
+      : null,
+  })),
   setSatellitesLoaded: (loaded) => set({ satellitesLoaded: loaded }),
+  bumpSatellitesVersion: () => set((s) => ({ satellitesVersion: s.satellitesVersion + 1 })),
   setAutoRotate: (enabled) => set({ autoRotate: enabled }),
   focusDish: () => set((s) => ({ focusDishRequested: s.focusDishRequested + 1 })),
   setTleLastFetched: (timestamp) => set({ tleLastFetched: timestamp }),
@@ -85,4 +95,5 @@ export const useAppStore = create<AppState>((set) => ({
   setHudVisible: (visible) => set({ hudVisible: visible }),
   setISLPrediction: (enabled) => set({ islPrediction: enabled }),
   setDemoLocation: (location) => set({ demoLocation: location }),
+  setCameraMode: (mode) => set({ cameraMode: mode }),
 }));

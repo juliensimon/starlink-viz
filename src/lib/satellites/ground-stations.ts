@@ -14,6 +14,8 @@ export interface GroundStation {
   lon: number;
   /** operational = confirmed active; planned = approved/under construction */
   status?: 'operational' | 'planned';
+  /** gateway = ground station with antennas; pop = internet point of presence / data center */
+  type?: 'gateway' | 'pop';
 }
 
 /** Mutable array — empty until refreshGroundStations() populates it. */

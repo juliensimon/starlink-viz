@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useAppStore, DEMO_LOCATIONS } from '@/stores/app-store';
 
 export default function ViewControls() {
+  const cameraMode = useAppStore((s) => s.cameraMode);
+  const setCameraMode = useAppStore((s) => s.setCameraMode);
   const autoRotate = useAppStore((s) => s.autoRotate);
   const setAutoRotate = useAppStore((s) => s.setAutoRotate);
   const altitudeFilter = useAppStore((s) => s.altitudeFilter);
@@ -38,6 +40,32 @@ export default function ViewControls() {
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-2">
         Controls
       </div>
+
+      {/* Space/Sky view toggle */}
+      <button
+        onClick={() => setCameraMode(cameraMode === 'space' ? 'sky' : 'space')}
+        className="flex items-center gap-2 w-full text-left mb-2 group"
+      >
+        <div
+          className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
+            cameraMode === 'sky' ? 'bg-indigo-500/40 justify-end' : 'bg-white/10 justify-start'
+          }`}
+        >
+          <div
+            className={`w-2.5 h-2.5 rounded-full mx-0.5 transition-colors duration-200 ${
+              cameraMode === 'sky' ? 'bg-indigo-400' : 'bg-white/40'
+            }`}
+          />
+        </div>
+        <div>
+          <span className="text-[11px] text-white/70 group-hover:text-white/90 transition-colors">
+            {cameraMode === 'space' ? 'Space View' : 'Sky View'}
+          </span>
+          <div className="text-[9px] text-white/45 leading-tight">
+            {cameraMode === 'space' ? 'Looking at Earth from space' : 'Night sky from observer'}
+          </div>
+        </div>
+      </button>
 
       {/* Demo/Live toggle */}
       <button
