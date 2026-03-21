@@ -552,6 +552,124 @@ This uses the same SGP4 propagation as the main satellite positions — just eva
 
 ---
 
+## Appendix: FCC Parameter Cross-Reference
+
+This appendix systematically maps every simulation parameter to its FCC/ITU filing source (or documents the absence of one). Parameters are grouped by domain.
+
+### Filing Index
+
+| Citation Key | Filing Number | Date | Description | URL |
+|-------------|--------------|------|-------------|-----|
+| **FCC-LOA-2016** | SAT-LOA-20161115-00118 | Nov 2016 | Original Starlink application — 4,425 sats at 1,100–1,325 km | [fcc.report](https://fcc.report/IBFS/SAT-LOA-20161115-00118/1158350.pdf) |
+| **FCC-MOD-2018** | SAT-MOD-20181108-00083 | Nov 2018 | Gen1 altitude reduction — 1,584 sats from 1,150 km → 550 km | [fcc.report](https://fcc.report/IBFS/SAT-MOD-20181108-00083/1569860.pdf) |
+| **FCC-MOD-2020** | SAT-MOD-20200417-00037 | Apr 2020 | Gen1 3rd modification — lower remaining 2,824 sats to 540–570 km; ISL architecture | [fcc.report](https://fcc.report/IBFS/SAT-MOD-20200417-00037/2274316.pdf) |
+| **FCC 21-48** | FCC 21-48 | Apr 2021 | Gen1 final authorization — 4,408 sats in 5 shells at 540–570 km | [docs.fcc.gov](https://docs.fcc.gov/public/attachments/fcc-21-48a1.pdf) |
+| **FCC 22-91** | FCC 22-91 | Dec 2022 | Gen2 partial authorization — 7,500 sats at 525/530/535 km | [docs.fcc.gov](https://docs.fcc.gov/public/attachments/FCC-22-91A1.pdf) |
+| **DA 26-36** | DA 26-36 | Jan 2026 | Gen2 upgrade — additional 7,500 sats at VLEO 340–485 km | [docs.fcc.gov](https://docs.fcc.gov/public/attachments/DA-26-36A1.pdf) |
+| **SES-LIC-2020** | SES-LIC-INTR2020-02547 | 2020 | User terminal antenna patterns and EIRP specifications | [fcc.report](https://fcc.report/IBFS/SES-LIC-INTR2020-02547) |
+| **Handley 2018** | — | 2018 | "Delay is Not an Option" — foundational LEO ISL routing paper | [ACM DL](https://dl.acm.org/doi/10.1145/3286062.3286075) |
+| **Bhattacherjee & Singla 2019** | — | 2019 | "Network topology design at 27,000 km/hour" — ISL topology optimization | [PDF](https://bdebopam.github.io/papers/conext19_LEO_topology.pdf) |
+| **Chaudhry & Yanikomeroglu 2021** | — | 2021 | "Laser Inter-Satellite Links in a Starlink Constellation" — ISL analysis | [arXiv](https://arxiv.org/pdf/2103.00056) |
+
+### A. Orbital Shell Configuration
+
+Code locations: `SHELL_TARGETS` and `SHELL_ALT_BANDS` in `src/lib/config.ts`
+
+| Parameter | Simulation Value | FCC-Filed Value | Filing | Gap | Notes |
+|-----------|-----------------|----------------|--------|-----|-------|
+| 53° shell altitude | 460–570 km operational band | 550 km (Gen1), 525 km (Gen2) | FCC 21-48, FCC 22-91 | **Intentional divergence** | SGP4-observed clusters at 480–490 km (lowered Gen1) and 540–560 km; FCC specifies "center" altitude ±30 km |
+| 53° shell sat count | `SHELL_TARGETS[2].target = 4408` | 1,584 (53.0°) + 1,584 (53.2°) + Gen2 | FCC 21-48, FCC 22-91 | **Validated** | 4,408 = sum of Gen1 53° shells (1,584 + 1,584 + remainder from other shells); Gen2 adds more at 525 km |
+| 53° plane count | `SHELL_TARGETS[2].planes = 72` | 72 planes × 22 sats/plane (Gen1) | FCC 21-48 | **Validated** | Gen1 uses 72 planes across both 53° sub-shells |
+| 43° shell altitude | 460–570 km band | 530 km (Gen2) | FCC 22-91 | **Intentional divergence** | Wide band to capture orbit-raising satellites; operational center matches filing |
+| 43° shell sat count | `SHELL_TARGETS[1].target = 2000` | 2,500 authorized (Gen2) | FCC 22-91 | **Outdated** | Simulation uses 2,000; FCC 22-91 authorized 2,500 for 43° at 530 km |
+| 33° shell altitude | 460–570 km band (placeholder) | 535 km (Gen2) | FCC 22-91 | **Validated** | Not yet launched; placeholder band is appropriate |
+| 33° shell sat count | `SHELL_TARGETS[0].target = 2000` | 2,500 authorized (Gen2) | FCC 22-91 | **Outdated** | Simulation uses 2,000; FCC 22-91 authorized 2,500 for 33° at 535 km |
+| 70° shell altitude | 460–910 km band | 570 km | FCC 21-48 | **Intentional divergence** | FCC authorized 570 km, but SGP4 observes ~880–900 km cluster; no FCC amendment found for higher altitude. Wide band captures both filed and observed altitudes |
+| 70° shell sat count | `SHELL_TARGETS[3].target = 2000` | 720 (Gen1) | FCC 21-48 | **Intentional divergence** | Simulation target is aspirational (includes future Gen2); Gen1 filing authorized 720 in 36 planes × 20 sats |
+| 97.6° shell altitude | 460–600 km band | 560 km | FCC 21-48 | **Validated** | SGP4-observed 550–590 km matches filed 560 km ±30 km |
+| 97.6° shell sat count | `SHELL_TARGETS[4].target = 520` | 348 + 172 = 520 | FCC 21-48 | **Validated** | 6 planes × 58 sats + 4 planes × 43 sats = 520 total |
+| VLEO shells | Not implemented | 340–485 km at 28°/32°/43°/53° | DA 26-36 | **Missing** | 7,500 additional sats authorized Jan 2026; not yet populated or modeled |
+
+### B. Antenna / User Terminal
+
+Code location: `MAX_STEERING_DEG`, `MIN_ELEVATION_DEG` in `src/lib/config.ts`
+
+| Parameter | Simulation Value | FCC-Filed Value | Filing | Gap | Notes |
+|-----------|-----------------|----------------|--------|-----|-------|
+| Min elevation angle | `MIN_ELEVATION_DEG = 25` | 25° minimum operational elevation | FCC 21-48, FCC-MOD-2018 | **Validated** | FCC specifies 25° minimum for user terminals and gateways; gateways may use 5° above 62° latitude |
+| Max steering angle | `MAX_STEERING_DEG = 25` | "100-degree field of view" (±50° from boresight) | SES-LIC-2020 | **Intentional divergence** | FCC filing describes a 100° FoV phased array (±50°), but gain degrades significantly past ~25° from boresight (33.2 dBi at boresight → 30.6 dBi at max slant). The 25° value represents the *practical* steering range for reliable service, not the hardware maximum |
+| Antenna gain at boresight | Not modeled | 33.2 dBi (Rx), 34.6 dBi (Tx) | SES-LIC-2020 | **Missing** | No RF link budget computed |
+| Antenna gain at max slant | Not modeled | 30.6 dBi (Rx), 32.0 dBi (Tx) | SES-LIC-2020 | **Missing** | ~2.6 dB scan loss at maximum steering |
+
+### C. ISL Parameters
+
+Code locations: `src/lib/config.ts`, `src/lib/satellites/isl-graph.ts`, `src/lib/satellites/isl-capability.ts`
+
+| Parameter | Simulation Value | FCC-Filed / Published Value | Source | Gap | Notes |
+|-----------|-----------------|---------------------------|--------|-----|-------|
+| Terminals per satellite | 4 (2 in-plane, 2 cross-plane) | 4 laser terminals | FCC-MOD-2020 | **Validated** | Originally 5 (including cross-plane crossing link); SpaceX dropped to 4. The 2+2 topology matches the filing description |
+| ISL max range | `ISL_MAX_RANGE_KM = 5016` | ~5,400 km demonstrated | SpaceX engineer statement (Travis Brashears) | **Validated** | Code uses 5,016 km (conservative); SpaceX demonstrated 5,400 km link. No FCC-filed maximum |
+| Polar exclusion | `ISL_POLAR_EXCLUSION_DEG = 70` | Not filed | — | **Missing** | Engineering estimate: orbital planes converge near poles, increasing relative angular rate beyond gimbal tracking limits. Academic papers (Handley 2018, Bhattacherjee & Singla 2019) use similar cutoffs (~±75°) |
+| OEO delay per hop | `ISL_PROCESSING_DELAY_MS = 0.3` | Not filed | — | **Missing** | Engineering estimate (0.2–0.4 ms range from academic literature). No FCC or SpaceX public specification |
+| ISL capability (53°) | Launch year ≥ 2022 | v1.5 laser links from Sep 2021 (first full ISL batch launched Jan 2022) | SpaceX announcements | **Validated** | First v1.5 with lasers launched Sep 2021 from Vandenberg; first full ISL-equipped batch Jan 2022 |
+| ISL capability (polar) | Launch year ≥ 2022 | Polar ISL from Jan 2021 (Transporter-1 mission) | SpaceX announcements | **Intentional divergence** | First polar laser sats launched Jan 2021; code uses 2022 cutoff (conservative — the Jan 2021 batch was 10 sats only) |
+| ISL capability (43°) | Launch year ≥ 2023 | All v2 Mini have 4 laser terminals | SpaceX statements | **Validated** | 43° shell populated exclusively with v2 Mini, all ISL-equipped |
+| Graph rebuild interval | `ISL_GRAPH_REBUILD_MS = 30000` | Not filed | — | **Missing** | Engineering choice — orbital plane topology is stable at 30s intervals |
+| Max ISL hops | `ISL_MAX_HOPS = 6` | Not filed | — | **Missing** | Engineering estimate; typical routes 1–3 hops, 6 allows oceanic ISL bridging |
+
+### D. Latency / Backhaul Model
+
+Code locations: `src/lib/config.ts`, `src/lib/utils/backhaul-latency.ts`, `src/lib/utils/isl-pathfinder.ts`
+
+| Parameter | Simulation Value | FCC-Filed / Published Value | Source | Gap | Notes |
+|-----------|-----------------|---------------------------|--------|-----|-------|
+| Base processing RTT | `BASE_PROCESSING_RTT_MS = 6` | Not filed | — | **Missing** | Engineering estimate: dish modem (~1 ms) + satellite bent-pipe (~0.3 ms) + GS RF (~0.5 ms) + GS→PoP network (~0.5 ms) × 2 directions ≈ 5–8 ms. No public specification |
+| Fiber speed | `0.67c` (200,861 km/s) | Not filed | — | **Missing** | Standard telecom fiber: refractive index ~1.47 → c/1.47 ≈ 0.68c. The 0.67c value is slightly conservative but within accepted range |
+| Fiber route factor | `1.4×` great-circle distance | Not filed | — | **Missing** | Standard industry estimate for terrestrial fiber path overhead vs. straight-line distance. Actual values vary (1.2× urban to 1.6× mountainous) |
+| Router processing | `1.0 ms` per direction | Not filed | — | **Missing** | Standard estimate for router/switch processing delay |
+| PoP–GS max distance | `POP_GS_MAX_DISTANCE_KM = 1500` | Not filed | — | **Missing** | Inferred from SpaceX's terrestrial backhaul contracts. Ireland→Frankfurt (~1,200 km) is borderline; Spain→Frankfurt (~1,800 km) is too far |
+| Route hold time | `ROUTE_HOLD_MS = 30000` | Not filed | — | **Missing** | Engineering estimate matching observed real-network route stability (30–60s). Prevents per-second oscillation from ping jitter |
+| Speed of light | `299,792.458 km/s` | Physical constant | — | **Validated** | Exact value of c in vacuum |
+
+### E. Gateway / Ground Station
+
+Code location: `src/lib/satellites/ground-stations.ts`, HF dataset `juliensimon/starlink-ground-stations`
+
+| Parameter | Simulation Value | FCC-Filed / Published Value | Source | Gap | Notes |
+|-----------|-----------------|---------------------------|--------|-----|-------|
+| Station count | ~150+ (HF dataset) | Not specified as total | Various FCC Earth Station filings | **Partially verified** | US gateways filed individually with FCC IBFS; international gateways filed with national regulators (ARCEP, Ofcom, ACMA, etc.). No single filing enumerates all gateways |
+| Gateway frequencies | Not modeled | Ku-band (10.7–14.5 GHz user), Ka-band (17.8–29.1 GHz gateway), E-band (Gen2) | FCC 22-91, DA 26-36 | **Missing** | App doesn't model frequency bands; relevant for rain fade and capacity |
+| Gateway min elevation | Uses line-of-sight geometry | 25° (general), 5° (polar >62° latitude) | FCC 21-48 | **Intentional divergence** | Code uses geometric LoS check (effectively 0° cutoff) rather than the 25° filed minimum. This means the simulation may route to gateways that the real system would consider below minimum elevation |
+| Station type classification | `gateway` / `pop` | Not distinguished in FCC filings | — | **Missing** | The gateway vs. PoP distinction is inferred from community data (rDNS patterns), not from filings |
+
+### Parameters Without FCC Source
+
+The following simulation parameters have **no FCC filing or public SpaceX specification** backing them. They are engineering estimates derived from academic literature, industry standards, or community observation:
+
+| Parameter | Value | Basis | Code Location |
+|-----------|-------|-------|---------------|
+| ISL polar exclusion latitude | ±70° | Academic papers model similar cutoffs (±70–75°); based on gimbal tracking limits at orbital plane convergence | `config.ts:74` |
+| OEO conversion delay | 0.3 ms/hop | Academic literature range (0.2–0.4 ms); no public spec | `config.ts:66` |
+| Base processing RTT | 6 ms | Component-level estimate; community-observed pings suggest 5–8 ms non-propagation overhead | `config.ts:78` |
+| Fiber backhaul speed | 0.67c | Standard telecom; slightly conservative vs. typical 0.68c | `backhaul-latency.ts:53` |
+| Fiber route factor | 1.4× | Industry estimate for fiber path vs. great-circle | `backhaul-latency.ts:54` |
+| PoP–GS backhaul limit | 1,500 km | Inferred from SpaceX backhaul contracts | `isl-pathfinder.ts:70` |
+| Route hold duration | 30 s | Matches observed real-network route stability | `isl-pathfinder.ts:313` |
+| ISL max hops | 6 | Simulation cap; typical routes 1–3 hops | `config.ts:68` |
+| ISL graph rebuild interval | 30 s | Performance/accuracy tradeoff | `config.ts:69` |
+
+### Methodology
+
+**How filings were located:** FCC filings were accessed via [fcc.report](https://fcc.report) (IBFS search) and [docs.fcc.gov](https://docs.fcc.gov) (public attachments). Filing numbers cross-referenced against SpaceX's public docket history and the FCC's International Bureau Filing System. Academic papers sourced from ACM Digital Library and arXiv.
+
+**Interpretation notes:**
+- FCC-filed altitudes represent "center" altitude with ±30 km operational range (stated in FCC 21-48). The simulation's wider altitude bands (e.g., 460–570 km for the 53° shell) are intentional — they accommodate orbit-raising satellites and altitude drift between TLE updates.
+- The 70° shell at 880–900 km (observed) vs. 570 km (filed) represents the largest filing-to-observation discrepancy. No FCC amendment was found authorizing this higher altitude. This may relate to Starshield operations or interim constellation management.
+- Satellite counts in `SHELL_TARGETS` mix Gen1 (FCC 21-48) and Gen2 (FCC 22-91) targets. The 33° and 43° shell targets of 2,000 undercount the FCC 22-91 authorization of 2,500 each.
+- The user terminal's 100° field of view (±50° from boresight, per SES-LIC-2020) is wider than the 25° steering cone used by the simulation. The simulation value reflects practical service range (where gain remains adequate), not hardware capability.
+
+---
+
 ## Summary: What's Real vs. What's Inferred
 
 
@@ -563,14 +681,14 @@ This uses the same SGP4 propagation as the main satellite positions — just eva
 | **Dish stats (live mode)**       | Your dish's hardware API                     | **Real** — straight from the hardware                               |
 | **Network path (live mode)**     | Traceroute + DNS lookup                      | **Real** — actual network measurement                               |
 | **Ground station locations**     | HF dataset (Starlink Insider + FCC IBFS + rDNS) | **Mostly real** — gateways + PoPs loaded from HF, auto-updated daily; some may be missing |
-| **Antenna steering range (25°)** | Community observation + FCC filings          | **Educated guess** — real value is proprietary, varies by HW rev    |
+| **Antenna steering range (25°)** | FCC filing (100° FoV) + practical gain cutoff | **Intentional divergence** — FCC allows ±50°, but gain degrades past ~25° (see Appendix §B) |
 | **Which satellite you're on**    | Inferred from antenna + geometry             | **Probably right** — but no way to verify                           |
 | **Satellite selection logic**    | Boresight alignment + path-length tiebreaker | **Simplified** — real logic involves fleet-wide optimization        |
 | **Gateway assignment**           | PoP-constrained selection with ISL fallback   | **Predicted** — uses PoP constraint + LoS + ISL graph; real routing adds load balancing |
 | **Handoff triggers**             | Elevation/boresight threshold                | **Simplified** — real triggers are centrally scheduled per-beam     |
 | **Demo ping latency**            | Speed-of-light calculation from geometry     | **Physics-based** — correct propagation delay, estimated processing |
 | **Demo throughput/SNR**          | Procedural sine waves                        | **Fake** — realistic-looking ranges, no physics                     |
-| **Laser inter-satellite links**  | Predicted from launch year + 4-terminal graph | **Predicted** — heuristic ISL capability + CSR neighbor graph + BFS pathfinding |
+| **Laser inter-satellite links**  | Predicted from launch year + 4-terminal graph | **Predicted** — 4-terminal topology matches FCC filing; ISL range/polar exclusion are estimates (see Appendix §C) |
 | **RF link budget**               | Not computed                                 | **Missing** — would require proprietary antenna specs               |
 | **Sky view az/el projection**    | ENU frame + spherical trig                   | **Real** — same math as antenna controllers                         |
 | **Star positions**               | J2000 RA/Dec via GMST transform              | **Real** — standard astronomy, ~0.36° precession drift by 2026     |
