@@ -145,31 +145,40 @@ The `daily_snapshots` table is rebuilt from `tle_snapshots` for each date. For a
 
 #### `tle_snapshots` — Per-satellite orbital elements
 
+**Raw fields** (directly from NORAD/Space-Track TLE data):
+
 | Column | Type | Description |
 |--------|------|-------------|
-| `norad_id` | int | NORAD catalog number (unique satellite ID) |
-| `name` | string | Satellite name (e.g., STARLINK-1234) |
-| `epoch_utc` | datetime | TLE epoch timestamp |
-| `inclination` | float | Orbital inclination (degrees) |
-| `raan` | float | Right ascension of ascending node (degrees) |
-| `eccentricity` | float | Orbital eccentricity |
-| `mean_motion` | float | Mean motion (revolutions/day) |
-| `mean_motion_dot` | float | First derivative of mean motion (drag indicator) |
-| `altitude_km` | float | Derived perigee altitude (km) |
-| `launch_year` | int | Year of launch |
-| `shell_id` | int | Orbital shell assignment (0-4) |
-| `shell_name` | string | Human-readable shell name |
-| `status` | string | Satellite status: operational, raising, deorbiting, decayed, anomalous, unknown |
-| `is_isl_capable` | bool | Whether the satellite has inter-satellite laser links |
+| `norad_id` | int | NORAD catalog number (unique satellite ID assigned by 18th Space Defense Squadron) |
+| `name` | string | Satellite name (e.g., STARLINK-1234, assigned by SpaceX via Space-Track) |
+| `epoch_utc` | datetime | TLE epoch — when these orbital elements were measured |
+| `inclination` | float | Orbital inclination (degrees) — angle of orbit plane relative to equator |
+| `raan` | float | Right ascension of ascending node (degrees) — orientation of orbital plane |
+| `eccentricity` | float | Orbital eccentricity — how circular the orbit is (0 = perfect circle) |
+| `mean_motion` | float | Mean motion (revolutions/day) — how fast the satellite orbits Earth |
+| `mean_motion_dot` | float | First derivative of mean motion — rate of orbital decay from atmospheric drag |
+| `launch_year` | int | Year of launch (parsed from COSPAR international designator) |
+
+**Computed fields** (derived by our pipeline, not in raw TLE data):
+
+| Column | Type | How it's computed |
+|--------|------|-------------------|
+| `altitude_km` | float | Kepler's 3rd law: `a = (μ/n²)^(1/3)`, then `alt = a(1-e) - 6371`. Accurate to ~1 km vs SGP4 for near-circular orbits |
+| `shell_id` | int | Inclination range mapping: <38°→0, 38-48°→1, 48-60°→2, 60-80°→3, >80°→4 |
+| `shell_name` | string | Human label for shell_id (e.g., "Shell 3 (53° / 550km)") |
+| `status` | string | Classified from altitude history: `operational` (at target altitude), `raising` (climbing, 3+ points increasing), `deorbiting` (descending >1 km/day), `decayed` (altitude <250km + stale epoch), `anomalous` (eccentricity >0.005), `unknown` (insufficient history) |
+| `is_isl_capable` | bool | Launch-year heuristic: polar/53° shells from 2022+, 43° from 2023+, 33° from 2024+. Not verified against actual hardware — some edge cases may be wrong |
 
 #### `daily_snapshots` — Per-shell daily aggregates
+
+All fields in this table are **computed** by aggregating `tle_snapshots` for each date. For a given date, the pipeline finds the most recent TLE per satellite on or before that date, then groups by shell.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `date` | date | Snapshot date |
 | `shell_id` | int | Orbital shell (0-4) |
 | `shell_name` | string | Human-readable shell name |
-| `total_count` | int | Total satellites in shell |
+| `total_count` | int | Active satellites in shell (excludes decayed) |
 | `operational_count` | int | Satellites at operational altitude |
 | `raising_count` | int | Satellites climbing to operational altitude |
 | `deorbiting_count` | int | Satellites descending (>1 km/day) |
@@ -178,28 +187,28 @@ The `daily_snapshots` table is rebuilt from `tle_snapshots` for each date. For a
 | `avg_altitude` | float | Mean altitude across shell (km) |
 | `min_altitude` | float | Lowest satellite in shell (km) |
 | `max_altitude` | float | Highest satellite in shell (km) |
-| `new_launches` | int | Newly cataloged satellites |
+| `new_launches` | int | Satellites whose first TLE appeared on this date |
 | `anomalous_count` | int | Satellites with unusual orbits (e > 0.005) |
 
 #### `latest_satellites` — Most recent snapshot per satellite
 
-One row per satellite with its latest known orbital parameters. Useful for current constellation analysis without scanning the full history.
+One row per satellite with its latest known orbital parameters. This is a **convenience view** — equivalent to `SELECT * FROM tle_snapshots WHERE (norad_id, epoch_ts) IN (SELECT norad_id, MAX(epoch_ts) FROM tle_snapshots GROUP BY norad_id)`, but pre-materialized as a small file (0.5 MB vs 618 MB for the full history).
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `norad_id` | int | NORAD catalog number |
-| `name` | string | Satellite name |
-| `altitude_km` | float | Current altitude (km) |
-| `shell_id` | int | Orbital shell (0-4) |
-| `shell_name` | string | Human-readable shell name |
-| `status` | string | Current status |
-| `inclination` | float | Orbital inclination (degrees) |
-| `raan` | float | Right ascension of ascending node |
-| `mean_motion` | float | Revolutions per day |
-| `eccentricity` | float | Orbital eccentricity |
-| `is_isl_capable` | bool | Has laser inter-satellite links |
-| `launch_year` | int | Year of launch |
-| `epoch_ts` | int | Unix timestamp of latest TLE epoch |
+| Column | Source | Type | Description |
+|--------|--------|------|-------------|
+| `norad_id` | raw | int | NORAD catalog number |
+| `name` | raw | string | Satellite name |
+| `inclination` | raw | float | Orbital inclination (degrees) |
+| `raan` | raw | float | Right ascension of ascending node |
+| `mean_motion` | raw | float | Revolutions per day |
+| `eccentricity` | raw | float | Orbital eccentricity |
+| `launch_year` | raw | int | Year of launch |
+| `epoch_ts` | raw | int | Unix timestamp of latest TLE epoch |
+| `altitude_km` | computed | float | Current altitude (km) |
+| `shell_id` | computed | int | Orbital shell (0-4) |
+| `shell_name` | computed | string | Human-readable shell name |
+| `status` | computed | string | Current satellite status |
+| `is_isl_capable` | computed | bool | Estimated laser link capability |
 
 ### Orbital Shells
 
