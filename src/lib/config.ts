@@ -53,6 +53,15 @@ export const SHELL_ALT_BANDS: { minInc: number; maxInc: number; minAlt: number; 
   { minInc: 80, maxInc: 180, minAlt: 460, maxAlt: 600 }, // 97.6° — observed 550-590 km
 ];
 
+/** FCC-authorized constellation targets per shell (Gen1 + Gen2 filings) */
+export const SHELL_TARGETS: Record<number, { target: number; label: string; altitude: string; planes: number; purpose: string }> = {
+  0: { target: 2000, label: '33°', altitude: '525 km', planes: 72, purpose: 'Low-latitude fill' },
+  1: { target: 2000, label: '43°', altitude: '540 km', planes: 72, purpose: 'Mid-latitude density' },
+  2: { target: 4408, label: '53°', altitude: '550 km', planes: 72, purpose: 'Gen1 core' },
+  3: { target: 2000, label: '70°', altitude: '570 km', planes: 36, purpose: 'High-latitude coverage' },
+  4: { target: 520, label: '97.6°', altitude: '560 km', planes: 6, purpose: 'Sun-synchronous polar' },
+};
+
 /** ISL (Inter-Satellite Laser Link) constants */
 export const ISL_PROCESSING_DELAY_MS = 0.3;  // OEO conversion per hop; real measured ~0.2-0.4ms
 export const ISL_MAX_RANGE_KM = 5016;

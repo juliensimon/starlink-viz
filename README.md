@@ -145,6 +145,7 @@ src/
 | `npm run start` | Start production server |
 | `npm run test` | Run tests (vitest) |
 | `npm run update-gs` | Update ground station data |
+| `npm run ingest` | Ingest latest TLEs from CelesTrak |
 
 ## Tech stack
 
@@ -183,6 +184,17 @@ This project aims to be as accurate as possible using exclusively public data. N
 **What this app does NOT have access to**: SpaceX's internal satellite scheduling, inter-satellite laser link routing, per-satellite capacity/load, precise orbital data used by the dish (more accurate than public TLEs), or satellite maneuver/deorbit status.
 
 Everything beyond public data and live dish readings is an approximation or educated guess. For a full breakdown of what's measured vs. inferred, see the [Technical Review](docs/TECHNICAL_REVIEW.md).
+
+## Fleet Monitor & Historical Dataset
+
+The `/fleet` page tracks Starlink constellation health over time using historical NORAD TLE data — constellation growth, altitude distribution, shell fill rates, launch cadence, satellite lifecycles, orbital planes, and ISL coverage.
+
+The complete dataset is published on Hugging Face: **[juliensimon/starlink-fleet-data](https://huggingface.co/datasets/juliensimon/starlink-fleet-data)**
+
+- **21.4M TLE snapshots** across 10,565 satellites (May 2019 → present)
+- **2,418 days** of continuous orbital element history
+- **3 tables**: per-satellite TLE snapshots, daily per-shell aggregates, latest satellite state
+- Available as Parquet files for direct use with `datasets`, pandas, or DuckDB
 
 ## Documentation
 
