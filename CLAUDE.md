@@ -70,9 +70,9 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 - **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
 - **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 
-### Ground Stations (`data/ground-stations.json`)
+### Ground Stations (HF dataset)
 
-204 gateways (168 operational, 36 planned) sourced from FCC IBFS, Starlink Insider, and international regulatory filings. Planned stations are rendered with reduced opacity and **excluded from gateway selection routing** in `ConnectionBeam.tsx`. Fallback data is embedded in `src/lib/satellites/ground-stations.ts`.
+Loaded exclusively from HF dataset [`juliensimon/starlink-ground-stations`](https://huggingface.co/datasets/juliensimon/starlink-ground-stations) (gateways config). `GROUND_STATIONS` starts empty and is populated via `refreshGroundStations()`: server-side fetches from HF API directly, client-side fetches from `/api/ground-stations`. All derived data (3D positions in `GroundStations.tsx`/`ConnectionBeam.tsx`, backhaul RTT, ISL pathfinder arrays) uses lazy recomputation via `groundStationsVersion` counter. Planned stations are rendered with reduced opacity and **excluded from gateway selection routing**.
 
 ### Fleet Monitor (`/fleet`)
 
