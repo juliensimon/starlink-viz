@@ -14,7 +14,7 @@ import { getPositionsArray, getISLCapableArray, getDetectedPop, type RoutePath }
 import { getISLGraph } from '../satellites/isl-graph';
 import { geodeticToCartesian } from './coordinates';
 import { computeGeometricLatency, computeISLRouteLatency, SPEED_OF_LIGHT_KM_S } from './geometric-latency';
-import { GROUND_STATIONS } from '../satellites/ground-stations';
+import { GROUND_STATIONS, groundStationsVersion } from '../satellites/ground-stations';
 import { GS_BACKHAUL_RTT_MS } from './backhaul-latency';
 import { ISL_MAX_HOPS, ISL_PROCESSING_DELAY_MS, EARTH_RADIUS_KM } from '../config';
 
@@ -22,15 +22,24 @@ function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
-// Pre-compute ground station 3D positions (unit-sphere)
-const gsPositions = GROUND_STATIONS.map((gs) => {
-  return geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1);
-});
+// Lazily computed ground station derived data — recomputed when groundStationsVersion changes
+let gsPositions: ReturnType<typeof geodeticToCartesian>[] = [];
+let operationalGSIndices: number[] = [];
+let lastGSVersion = -1; // force initial compute
 
-// Operational station indices only
-const operationalGSIndices = GROUND_STATIONS
-  .map((gs, i) => (gs.status !== 'planned' ? i : -1))
-  .filter((i) => i >= 0);
+function ensureGSData(): void {
+  if (lastGSVersion === groundStationsVersion) return;
+  gsPositions = GROUND_STATIONS.map((gs) =>
+    geodeticToCartesian(degToRad(gs.lat), degToRad(gs.lon), 0, 1),
+  );
+  operationalGSIndices = GROUND_STATIONS
+    .map((gs, i) => (gs.status !== 'planned' ? i : -1))
+    .filter((i) => i >= 0);
+  // Invalidate PoP GS cache since station indices changed
+  cachedPopGSIndices = null;
+  cachedPopName = null;
+  lastGSVersion = groundStationsVersion;
+}
 
 /**
  * PoP locations — maps the display name (from parsePopHostname) to lat/lon.
@@ -321,6 +330,8 @@ export function findBestRoute(
   dishPos: { x: number; y: number; z: number },
   measuredPing: number | null,
 ): RoutePath | null {
+  ensureGSData();
+
   const positions = getPositionsArray();
   const islCapable = getISLCapableArray();
   const graph = getISLGraph();

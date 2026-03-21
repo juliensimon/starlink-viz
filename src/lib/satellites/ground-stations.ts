@@ -1,7 +1,11 @@
 /**
  * Starlink ground station (gateway) locations.
- * Loads from data/ground-stations.json (updated via scripts/update-ground-stations.ts).
- * Falls back to embedded data if JSON file is unavailable.
+ * Primary source: HF dataset juliensimon/starlink-ground-stations
+ * Falls back to embedded FALLBACK_STATIONS if HF is unavailable.
+ *
+ * GROUND_STATIONS is a mutable array — refreshGroundStations() updates it
+ * in-place so all consumers see new data without re-importing.
+ * groundStationsVersion increments on each successful refresh.
  */
 
 export interface GroundStation {
@@ -220,26 +224,41 @@ const FALLBACK_STATIONS: GroundStation[] = [
   { name: 'Murayjat, Oman', lat: 23.588, lon: 58.545, status: 'operational' },
 ];
 
-function loadStations(): GroundStation[] {
-  // In browser: use fallback (JSON loaded via API)
-  if (typeof window !== 'undefined') return FALLBACK_STATIONS;
+// Mutable array — starts with fallback, updated in-place by refreshGroundStations()
+export const GROUND_STATIONS: GroundStation[] = [...FALLBACK_STATIONS];
 
-  // On server: try to load JSON file
+/** Incremented each time GROUND_STATIONS is refreshed from HF. Consumers
+ *  that cache derived data (e.g. gsPositions) should watch this counter. */
+export let groundStationsVersion = 0;
+
+/**
+ * Fetch fresh ground station data from the HF dataset and update
+ * GROUND_STATIONS in-place. Called at server boot; non-blocking.
+ * On failure, GROUND_STATIONS keeps its current (fallback) data.
+ *
+ * Also triggers recomputeBackhaulRTT() so GS_BACKHAUL_RTT_MS stays in sync.
+ */
+export async function refreshGroundStations(): Promise<void> {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(process.cwd(), 'data/ground-stations.json');
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    if (data.stations && data.stations.length > 0) {
-      return data.stations;
+    const { fetchHFGateways } = await import('./hf-ground-stations');
+    const stations = await fetchHFGateways();
+    if (stations.length === 0) {
+      console.warn('[GS] HF returned 0 gateways, keeping fallback data');
+      return;
     }
-  } catch {
-    // Fall through to fallback
-  }
-  return FALLBACK_STATIONS;
-}
+    // Mutate in-place so every module holding a reference sees the update
+    GROUND_STATIONS.length = 0;
+    GROUND_STATIONS.push(...stations);
+    groundStationsVersion++;
+    console.log(`[GS] HF ground stations loaded: ${stations.length} (v${groundStationsVersion})`);
 
-export const GROUND_STATIONS: GroundStation[] = loadStations();
+    // Recompute backhaul RTT with new station list
+    const { recomputeBackhaulRTT } = await import('../utils/backhaul-latency');
+    recomputeBackhaulRTT();
+  } catch (err) {
+    console.warn('[GS] Failed to fetch HF ground stations, using fallback:', err);
+  }
+}
 
 /**
  * Find the nearest ground station to a given lat/lon (in degrees).
