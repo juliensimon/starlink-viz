@@ -55,6 +55,9 @@ async function login(): Promise<void> {
   }
 
   const text = await res.text();
+  if (text.includes('"Failed"')) {
+    throw new Error('Space-Track login failed — account may be temporarily locked. Wait 15-30 min.');
+  }
   if (text !== '""' && text !== '' && !sessionCookie) {
     throw new Error(`Space-Track login failed: ${text}`);
   }
@@ -68,22 +71,30 @@ async function login(): Promise<void> {
 
 async function fetchMonth(yearMonth: string): Promise<OmmRecord[]> {
   const [year, month] = yearMonth.split('-').map(Number);
-  const from = `${year}-${String(month).padStart(2, '0')}-01`;
+  const monthStr = String(month).padStart(2, '0');
+  const from = `${year}-${monthStr}-01`;
   const nextMonth = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
 
-  // Early Starlink sats (launch 2019-029, May 2019) were "TBA" in GP_History.
-  // Query by OBJECT_ID for months before Nov 2019, by OBJECT_NAME after.
   // Early Starlink sats (launch 2019-029, May 2019) were "TBA" in GP_History.
   // Query by OBJECT_ID for months before Nov 2019, by OBJECT_NAME after.
   const useIntlDes = year === 2019 && month < 11;
   const nameFilter = useIntlDes ? 'OBJECT_ID/2019-029~~' : 'OBJECT_NAME/STARLINK~~';
 
-  // Split into 2-week chunks to avoid Space-Track 500 errors on large result sets
-  const mid = `${year}-${String(month).padStart(2, '0')}-16`;
-  const chunks = [
-    { from, to: mid },
-    { from: mid, to: nextMonth },
-  ];
+  // Split into daily chunks to avoid Space-Track 500 errors on large result sets
+  const fromDate = new Date(from);
+  const toDate = new Date(nextMonth);
+  const chunks: { from: string; to: string }[] = [];
+  const cursor = new Date(fromDate);
+  while (cursor < toDate) {
+    const next = new Date(cursor);
+    next.setUTCDate(next.getUTCDate() + 1);
+    if (next > toDate) next.setTime(toDate.getTime());
+    chunks.push({
+      from: cursor.toISOString().split('T')[0],
+      to: next.toISOString().split('T')[0],
+    });
+    cursor.setTime(next.getTime());
+  }
 
   const allRecords: OmmRecord[] = [];
   for (const chunk of chunks) {
@@ -91,8 +102,8 @@ async function fetchMonth(yearMonth: string): Promise<OmmRecord[]> {
     const records = await fetchChunk(url);
     allRecords.push(...records);
     if (records.length > 0) {
-      // Respect rate limits between chunks
-      await new Promise((r) => setTimeout(r, 30000));
+      // Respect rate limits between daily chunks
+      await new Promise((r) => setTimeout(r, 15000));
     }
   }
   return allRecords;
@@ -114,6 +125,14 @@ async function fetchChunk(url: string): Promise<OmmRecord[]> {
         },
         signal: AbortSignal.timeout(180000),
       });
+
+      if (res.status === 401 && attempt === 0) {
+        console.log('    Session expired — waiting 30s then re-authenticating...');
+        await new Promise((r) => setTimeout(r, 30000));
+        await login();
+        continue;
+      }
+      if (res.status === 401) throw new Error('HTTP 401 after re-auth');
 
       if (res.status === 429) {
         console.log('    Rate limited — waiting 180s...');
