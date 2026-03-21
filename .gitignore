@@ -44,6 +44,7 @@ yarn-error.log*
 
 # screenshots
 *.png
+!public/textures/*.png
 
 # typescript
 *.tsbuildinfo
