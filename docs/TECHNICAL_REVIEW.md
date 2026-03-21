@@ -196,11 +196,11 @@ This is a heuristic with known limitations:
 
 ### 6. Ground Station & PoP Locations — Partially Verified ⚠️
 
-**Data source:** Multi-source: community databases, regulatory filings, and Starlink rDNS records.
+**Data source:** Multi-source: community databases, regulatory filings, and Starlink rDNS records. Runtime data loaded exclusively from HuggingFace dataset.
 
-**Implementation:** `data/ground-stations.json` — 357 locations (307 gateways + 50 PoPs) with `type` (`'gateway'` | `'pop'`) and `status` (`'operational'` | `'planned'`) fields. Loaded by `src/lib/satellites/ground-stations.ts` with an auto-synced embedded fallback. Operational gateway positions are used for nearest-neighbor lookups in routing; planned stations and PoPs are rendered but excluded from gateway selection routing in `isl-pathfinder.ts`.
+**Implementation:** Ground stations are loaded exclusively from the HF dataset [`juliensimon/starlink-ground-stations`](https://huggingface.co/datasets/juliensimon/starlink-ground-stations) (gateways and pops configs). The `GROUND_STATIONS` array starts empty and is populated via `refreshGroundStations()`: server-side fetches directly from the HF API, client-side fetches from `/api/ground-stations`. All derived data (3D positions, backhaul RTT, ISL pathfinder arrays) uses lazy recomputation via a `groundStationsVersion` counter. Stations have `type` (`'gateway'` | `'pop'`) and `status` (`'operational'` | `'planned'`) fields. Planned stations are rendered with reduced opacity. Both planned and PoP entries are excluded from gateway selection routing in `isl-pathfinder.ts`.
 
-The app's database contains **307 gateways** (214 operational, 93 planned) and **50 PoPs** (35 operational, 15 planned) spanning all continents. A **weekly automated update** (`.github/workflows/update-ground-stations.yml`) fetches from all sources, reconciles data (name normalization, coordinate dedup within 5km, status merge, sanity checks), syncs the embedded fallback, and opens a PR if data changed.
+A **daily automated pipeline** (`juliensimon/space-datasets` on GitHub) scrapes Starlink Insider and FCC IBFS data, geocodes locations, and pushes updated parquet files to the HF dataset. The local `data/ground-stations.json` file serves as an offline backup but is not used at runtime.
 
 **Why "partially verified":**
 
@@ -308,37 +308,66 @@ Selection runs every **500ms** (not every frame, for performance).
 
 **How good is this approximation?** Boresight alignment is a sensible first-order heuristic — the phased array's signal quality peaks in the direction it's pointing, so the satellite closest to that direction likely has the best link. The path-length tiebreaker adds a rough latency preference. But this completely ignores the fleet-wide optimization that makes Starlink work at scale. It's like predicting which Uber driver will pick you up by choosing the nearest one — often right, but the real algorithm is far more complex.
 
-### 3. Gateway Selection — Extrapolated
+### 3. Gateway Selection — PoP-Constrained with ISL Routing
 
-**What the app does (in `ConnectionBeam.tsx:findNearestGS3D()`):** Picks the nearest **operational** ground station to the connected satellite by squared 3D Euclidean distance (planned stations are excluded from routing). A **5% hysteresis margin** prevents flickering when the satellite is roughly equidistant from two gateways — the current gateway sticks unless a new one is meaningfully closer (`minDist > currentDist * 0.95`). When a switch happens, the event log shows the **latency change** computed via `computeGeometricLatency()`.
+**What the app does (in `src/lib/utils/isl-pathfinder.ts`):** Gateway selection uses a multi-step algorithm constrained by the user's detected PoP (Point of Presence):
+
+1. **PoP constraint:** The detected PoP (via rDNS on public IP) limits gateway candidates to those within 1,500 km of the PoP city — because your traffic must exit the Starlink network at a gateway that connects to your PoP's internet exchange
+2. **Line-of-sight check:** Each candidate gateway is tested for direct satellite visibility (elevation above horizon)
+3. **Direct route preferred:** If any PoP-constrained gateway has line-of-sight to the connected satellite, the nearest one is selected (bent-pipe path)
+4. **ISL fallback:** When no valid gateway is directly visible (e.g., over oceans), the ISL graph is searched for a multi-hop path through neighboring satellites to reach a gateway
+5. **Route hold:** Selected routes are held for 30 seconds with periodic LoS validity checks to prevent flickering
+6. **Backhaul estimation:** Each gateway's ground-segment RTT is estimated via haversine distance to the nearest IXP at 0.67c (fiber speed) with a 1.4× fiber route factor (`src/lib/utils/backhaul-latency.ts`)
 
 **What the real system considers that we can't:**
 
 - Is this gateway at capacity? Is it raining there? (Rain severely degrades Ka-band signals — "rain fade" can reduce link margin by 10+ dB)
 - Is the traffic's internet destination closer to a different gateway's PoP?
-- Can the satellite reach a more suitable gateway via laser links through other satellites?
+- Real routing table optimization across thousands of concurrent users
 - Is this gateway scheduled for maintenance?
 
-**How good is this approximation?** "Nearest gateway" is reasonable for the legacy bent-pipe model (satellite relays directly to the closest ground station). But it can be completely wrong when inter-satellite laser links are involved — a satellite over the Atlantic might route your traffic through three other satellites to reach a European gateway, bypassing a closer but overloaded American one. The hysteresis at least prevents the event log from spamming gateway switches every frame — real systems avoid ping-ponging too.
+**How good is this approximation?** The PoP constraint is a meaningful improvement over pure nearest-gateway — it correctly models that traffic must exit near your assigned PoP. The ISL fallback handles the ocean/remote case where bent-pipe is impossible. However, the real system does fleet-wide optimization that balances load, weather, and capacity across all gateways simultaneously.
 
-**Note:** While the app now has 168 operational gateways (sourced from FCC/international filings), some operational sites may still be missing, so the "nearest" gateway shown may not always be the nearest gateway in reality.
+### 4. Inter-Satellite Laser Links — Predicted Model ⚠️
 
-### 4. Inter-Satellite Laser Links — Not Modeled ❌
+**Implementation:** The app models ISL routing using a heuristic-based prediction system. While no public data exists about SpaceX's actual ISL routing decisions, the model uses publicly available information to make educated predictions.
 
-**The biggest gap.** The app shows the old bent-pipe model: your data goes up to one satellite and straight back down to the nearest ground station. Modern Starlink satellites (v1.5+ and all v2 Mini) have **four laser terminals** that create high-speed optical links to neighboring satellites — forming a mesh network in space.
+**ISL capability detection** (`src/lib/satellites/isl-capability.ts`):
+- Polar shells (70°, 97.6°): all satellites assumed ISL-capable (laser links were deployed from the start on polar missions)
+- 53° shell: satellites launched from 2022 onward (v1.5+ and v2 Mini)
+- 43° shell: satellites launched from 2023 onward
+- 33° shell: satellites launched from 2024 onward
+- This heuristic is based on SpaceX's public statements and FCC filings about laser link deployment timelines
 
-**Why this matters:**
+**ISL neighbor graph** (`src/lib/satellites/isl-graph.ts`):
+- CSR (Compressed Sparse Row) encoded graph rebuilt every 30 seconds
+- Each ISL-capable satellite connects to **4 neighbors** (matching the 4 physical laser terminals): 2 in-plane (nearest neighbors in the same orbital plane) and 2 cross-plane (nearest neighbors in adjacent planes, matched by RAAN)
+- **Polar exclusion** at ±70° latitude — laser links are assumed inactive near the poles where orbital planes converge and relative angular rates become problematic
+- RAAN (Right Ascension of Ascending Node) parsed from TLE data to identify orbital planes
 
-- Over the ocean, there's no ground station in range. Without lasers, there's no internet. With lasers, traffic hops between satellites until it reaches one that can see a ground station. This is how Starlink works on ships and planes over open water.
-- The "nearest gateway" shown by this app can be completely wrong — traffic might route through 3-5 satellite hops to reach a gateway halfway around the world
-- ISL routing is arguably Starlink's most important competitive advantage and the core of the architecture going forward — every v2 Mini has laser links
-- The bent-pipe model this app shows is increasingly a legacy view (circa 2020); the constellation is evolving into a space-based mesh network
+**ISL pathfinding** (`src/lib/utils/isl-pathfinder.ts`):
+- ISL routes are only explored when no PoP-constrained gateway has direct line-of-sight to the connected satellite (mandatory ISL scenario)
+- When ISL is needed, a breadth-first search through the neighbor graph finds a path to a satellite that can see a valid gateway
+- Routes are held for 30 seconds with periodic LoS validity checks
 
-**Why it's missing:** There is zero public data about which laser links are active, how traffic is routed through the constellation, or even which specific satellites have functional laser terminals. This would require access to SpaceX's internal routing tables.
+**Latency model:**
+- Speed-of-light geometry for each hop (dish → sat → ISL hops → gateway)
+- 6 ms base processing RTT
+- **0.3 ms OEO (optical-electrical-optical) conversion** per ISL hop — each laser terminal receives, processes, and retransmits the signal
+- Per-gateway backhaul RTT from haversine distance to nearest IXP at 0.67c with 1.4× fiber route factor
+
+**Demo locations:** 5 remote locations where ISL is mandatory (Iceland Gap, North Atlantic, Mid-Atlantic, Gulf of Mexico, Celtic Sea) — selectable in ViewControls during demo mode. These demonstrate the ISL routing visualization with colored beam segments (cyan uplink, green ISL hops, orange downlink).
+
+**Why this is still approximate:**
+- There is zero public data about which laser links are actually active at any moment
+- The 4-terminal topology is from FCC filings, but the actual neighbor selection algorithm is proprietary
+- Real ISL routing optimizes for latency, capacity, and link budget simultaneously — the app only considers reachability
+- The polar exclusion zone (±70°) is an approximation; the actual cutoff depends on satellite-to-satellite geometry
+- The app cannot know if a specific satellite's laser terminals are operational or degraded
 
 **References:**
 - [Mark Handley, UCL — "Delay is Not an Option" (2018)](https://dl.acm.org/doi/10.1145/3286062.3286075) — foundational paper on LEO constellation ISL routing
-- [SpaceX Gen2 FCC filing](https://fcc.report/IBFS/SAT-MOD-20200417-00037) — describes laser link architecture
+- [SpaceX Gen2 FCC filing](https://fcc.report/IBFS/SAT-MOD-20200417-00037) — describes laser link architecture and 4-terminal design
 
 ### 5. Demo Mode Telemetry — Fabricated
 
@@ -378,24 +407,25 @@ The demo numbers are tuned to *feel* right, not to *be* right.
 
 **How it's computed:**
 
-
 | Segment               | Method                                         | Typical value   |
 | --------------------- | ---------------------------------------------- | --------------- |
 | Dish → Satellite      | Speed-of-light delay from SGP4 position        | ~1.8 ms one-way |
-| Satellite → Gateway   | Speed-of-light delay to nearest ground station | ~1.8 ms one-way |
-| Processing + backhaul | 3 ms base + 0-4 ms random jitter               | ~3-7 ms         |
-| **Round-trip total**  | Both legs × 2 + processing                     | **~20-40 ms**   |
+| Satellite → Gateway   | Speed-of-light delay to gateway (direct or via ISL hops) | ~1.8 ms one-way (direct) |
+| ISL hops (if any)     | Speed-of-light per hop + 0.3 ms OEO per hop   | ~2-5 ms per hop |
+| Processing            | 6 ms base RTT                                  | 6 ms            |
+| Gateway backhaul      | Haversine to nearest IXP at 0.67c × 1.4 fiber factor | 0-8 ms |
+| **Round-trip total**  | All segments × 2 + processing + backhaul       | **~20-60 ms**   |
 
+For direct (bent-pipe) routes: `RTT = (dist_dish_sat + dist_sat_gw) × 2 / c × 1000 + 6 + backhaul_rtt` ms
 
-Formula: `RTT = (dist_dish_sat + dist_sat_gw) × 2 / c × 1000 + 3 + random(0,4)` ms
+For ISL routes: each hop adds speed-of-light inter-satellite distance + 0.3 ms OEO (optical-electrical-optical conversion).
 
-This is real physics — light travels at ~300,000 km/s, the satellite is ~550 km up, so the uplink alone takes about 1.8 ms. The round trip (up-down-up-down, because you send a request and get a response) adds up to ~15 ms of pure speed-of-light delay, with the rest being processing and internet routing.
+This is real physics — light travels at ~300,000 km/s, the satellite is ~550 km up, so the uplink alone takes about 1.8 ms. The round trip adds up to ~15 ms of pure speed-of-light delay for a direct path, with ISL hops adding proportionally. Gateway backhaul (`src/lib/utils/backhaul-latency.ts`) estimates fiber-segment delay based on great-circle distance to the nearest internet exchange point.
 
 **What this misses:**
 
-- The processing delay (3 ms) is a guess — real delays depend on the satellite's onboard hardware, the gateway's equipment, and internet routing beyond the PoP
-- The jitter is random noise, not correlated with real congestion or weather
-- ISL hops add ~5 ms each if the satellite routes via other satellites (not modeled)
+- The processing delay (6 ms) is a guess — real delays depend on the satellite's onboard hardware, the gateway's equipment, and internet routing beyond the PoP
+- Real ISL routing optimizes for latency/capacity, not just reachability
 - At very low elevation angles, the signal travels through more atmosphere and the path is longer — the app computes this correctly from geometry
 
 ### 7. Handoff Mechanics — Simplified
@@ -532,15 +562,15 @@ This uses the same SGP4 propagation as the main satellite positions — just eva
 | **Globe, coordinates, geometry** | WGS-84 standard + textbook math              | **Real** — zero assumptions                                         |
 | **Dish stats (live mode)**       | Your dish's hardware API                     | **Real** — straight from the hardware                               |
 | **Network path (live mode)**     | Traceroute + DNS lookup                      | **Real** — actual network measurement                               |
-| **Ground station locations**     | Multi-source (starlink.sx + Starlink Insider + rDNS) | **Mostly real** — 307 gateways + 50 PoPs, auto-updated weekly; some may be missing |
+| **Ground station locations**     | HF dataset (Starlink Insider + FCC IBFS + rDNS) | **Mostly real** — gateways + PoPs loaded from HF, auto-updated daily; some may be missing |
 | **Antenna steering range (25°)** | Community observation + FCC filings          | **Educated guess** — real value is proprietary, varies by HW rev    |
 | **Which satellite you're on**    | Inferred from antenna + geometry             | **Probably right** — but no way to verify                           |
 | **Satellite selection logic**    | Boresight alignment + path-length tiebreaker | **Simplified** — real logic involves fleet-wide optimization        |
-| **Gateway assignment**           | Nearest of 307 gateways with 5% hysteresis   | **Simplified** — real routing is dynamic, weather-aware, ISL-routed |
+| **Gateway assignment**           | PoP-constrained selection with ISL fallback   | **Predicted** — uses PoP constraint + LoS + ISL graph; real routing adds load balancing |
 | **Handoff triggers**             | Elevation/boresight threshold                | **Simplified** — real triggers are centrally scheduled per-beam     |
 | **Demo ping latency**            | Speed-of-light calculation from geometry     | **Physics-based** — correct propagation delay, estimated processing |
 | **Demo throughput/SNR**          | Procedural sine waves                        | **Fake** — realistic-looking ranges, no physics                     |
-| **Laser inter-satellite links**  | Not shown                                    | **Missing** — no public data exists                                 |
+| **Laser inter-satellite links**  | Predicted from launch year + 4-terminal graph | **Predicted** — heuristic ISL capability + CSR neighbor graph + BFS pathfinding |
 | **RF link budget**               | Not computed                                 | **Missing** — would require proprietary antenna specs               |
 | **Sky view az/el projection**    | ENU frame + spherical trig                   | **Real** — same math as antenna controllers                         |
 | **Star positions**               | J2000 RA/Dec via GMST transform              | **Real** — standard astronomy, ~0.36° precession drift by 2026     |

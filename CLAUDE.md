@@ -11,7 +11,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Run all tests**: `npm run test` (vitest)
 - **Run single test**: `npx vitest run src/__tests__/coordinates.test.ts`
 - **Update ground stations data**: `npm run update-gs` (multi-source: starlinkinsider.com + starlink.sx + PoP list)
-- **Sync fallback stations**: `npx tsx scripts/sync-fallback.ts` (regenerate embedded fallback array from JSON)
 - **Type check**: `npx tsc --noEmit` (runs in CI before tests)
 - No linter or formatter is configured
 
@@ -31,7 +30,7 @@ Custom HTTP server wrapping Next.js that handles:
 
 - `/api/tle` — CelesTrak Starlink TLE data (6h in-memory cache)
 - `/api/tle-gps` — GPS constellation TLE data
-- `/api/ground-stations` — gateway catalog from `data/ground-stations.json`
+- `/api/ground-stations` — gateway catalog from HF dataset `juliensimon/starlink-ground-stations` (via `refreshGroundStations()`)
 - `/api/pop` — public IP + rDNS PoP city detection (5m cache)
 - `/api/isl-log` — ISL route decision log (GET last 100 lines / POST append)
 - `/api/mode` — GET/POST runtime demo/live mode switching (handled in `server.ts`, not Next.js)
@@ -95,7 +94,6 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 - **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 - **Toggle** — `islPrediction` in app-store, green pill-switch in ViewControls
 - **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
-- **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 
 ### Ground Stations (HF dataset)
 
@@ -112,8 +110,8 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 - **Database**: `data/fleet.db` (SQLite, gitignored) — `tle_snapshots` (per-satellite per-epoch) and `daily_snapshots` (materialized daily aggregates per shell)
 - **Ingestion**: `npm run ingest` fetches from CelesTrak, propagates via SGP4, classifies status, persists to SQLite
 - **Status classification** (`src/lib/fleet/classify.ts`) — sliding window of 3+ TLE epochs: `operational`, `raising`, `deorbiting`, `decayed`, `anomalous`, `unknown`
-- **API routes**: `/api/fleet/{growth,shells,altitudes,launches,satellite/[noradId],planes}`
-- **Charts** (`src/components/fleet/`) — 7 recharts panels: Constellation Growth, Altitude Distribution, Shell Fill Rate, Launch Cadence, Satellite Lifecycle, Orbital Planes (RAAN with J2 correction), ISL Coverage
+- **API routes**: `/api/fleet/{growth,shells,altitudes,launches,satellite/[noradId],planes,kpis,refresh,search,vintage}`
+- **Charts** (`src/components/fleet/`) — 9 recharts panels: Constellation Growth, Altitude Distribution, Shell Fill Rate, Launch Cadence, Satellite Lifecycle, Orbital Planes (RAAN with J2 correction), ISL Coverage, Launch Year Vintage, Shell Filling Timeline
 - **RAAN correction** (`src/lib/fleet/raan-correction.ts`) — J2 precession correction to common reference epoch for orbital plane analysis
 - **Shell targets** (`SHELL_TARGETS` in `config.ts`) — FCC-authorized constellation sizes per shell
 - **Filtering**: Only `STARLINK-\d+` names ingested (rejects Starshield, debris, TBA objects)
@@ -157,4 +155,4 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 ### CI
 
 - **CI** (`.github/workflows/ci.yml`): `tsc --noEmit` → `npm test` → `npm run build` on Node 20+22, triggered on push/PR to master
-- **Ground station updates** (`.github/workflows/update-ground-stations.yml`): weekly Monday 06:00 UTC + manual dispatch. Fetches sources → reconciles → syncs fallback → tests → opens PR via `peter-evans/create-pull-request`
+- **Ground station updates** (`.github/workflows/update-ground-stations.yml`): weekly Monday 06:00 UTC + manual dispatch. Fetches sources → reconciles → tests → opens PR via `peter-evans/create-pull-request`
