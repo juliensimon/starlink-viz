@@ -15,7 +15,6 @@ import {
 import type { DishStatus } from './src/lib/grpc/types';
 import { parsePopHostname } from './src/lib/utils/pop';
 import { runTraceroute } from './src/lib/utils/traceroute';
-import { refreshGroundStations } from './src/lib/satellites/ground-stations';
 
 const execFileAsync = promisify(execFile);
 
@@ -209,9 +208,6 @@ async function main() {
   console.log('');
 
   await app.prepare();
-
-  // Non-blocking: swap fallback data with fresh HF data when ready
-  refreshGroundStations();
 
   const server = createServer(async (req, res) => {
     // Mode switch API
