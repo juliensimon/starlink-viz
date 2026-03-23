@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { isISLCapable, parseRAANFromTLE, computeISLArrays } from '../lib/satellites/isl-capability';
 
 describe('isISLCapable', () => {
-  it('polar shells are always ISL-capable', () => {
-    expect(isISLCapable(70, 2019)).toBe(true);
-    expect(isISLCapable(97.6, 2018)).toBe(true);
-    expect(isISLCapable(80, 2020)).toBe(true);
+  it('polar shells are ISL-capable from 2022+', () => {
+    expect(isISLCapable(70, 2021)).toBe(false);
+    expect(isISLCapable(70, 2022)).toBe(true);
+    expect(isISLCapable(97.6, 2022)).toBe(true);
+    expect(isISLCapable(80, 2023)).toBe(true);
   });
 
   it('53° shell requires launch >= 2022', () => {
@@ -28,8 +29,9 @@ describe('isISLCapable', () => {
   });
 
   it('boundary inclinations are correctly classified', () => {
-    // 60° is polar (>= 60)
-    expect(isISLCapable(60, 2019)).toBe(true);
+    // 60° is polar (>= 60), ISL from 2022+
+    expect(isISLCapable(60, 2021)).toBe(false);
+    expect(isISLCapable(60, 2022)).toBe(true);
     // 48° is 53° shell
     expect(isISLCapable(48, 2021)).toBe(false);
     expect(isISLCapable(48, 2022)).toBe(true);
@@ -60,14 +62,14 @@ describe('computeISLArrays', () => {
       '2 25545  70.0000 240.0000 0004429 269.8571  90.2025 15.48919755349985',
     ];
     const inclinations = new Float32Array([53, 70]);
-    const launchYears = new Uint16Array([2022, 2020]);
+    const launchYears = new Uint16Array([2022, 2022]);
 
     const { raanArray, islCapableArray } = computeISLArrays(lines2, inclinations, launchYears, 2);
 
     expect(raanArray[0]).toBeCloseTo(120, 0);
     expect(raanArray[1]).toBeCloseTo(240, 0);
     expect(islCapableArray[0]).toBe(1); // 53° + 2022
-    expect(islCapableArray[1]).toBe(1); // 70° always
+    expect(islCapableArray[1]).toBe(1); // 70° + 2022
   });
 
   it('marks old 53° sats as not ISL-capable', () => {
