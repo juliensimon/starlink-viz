@@ -39,6 +39,9 @@ yarn-error.log*
 # playwright
 .playwright-mcp/
 
+# claude code
+.claude/
+
 # superpowers
 .superpowers/
 
