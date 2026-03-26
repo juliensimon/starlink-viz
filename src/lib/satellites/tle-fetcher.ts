@@ -9,18 +9,32 @@ export interface TLEData {
   inclination: number; // degrees, parsed from TLE line 2 columns 8-16
 }
 
-const CELESTRAK_URL =
+const HF_TLE_URL =
+  'https://huggingface.co/datasets/juliensimon/starlink-tle-latest/resolve/main/data/starlink.tle';
+const CELESTRAK_FALLBACK_URL =
   'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle';
 
 /**
- * Fetch TLE data from CelesTrak and parse into structured objects.
+ * Fetch TLE data from HF dataset (CelesTrak fallback) and parse into structured objects.
  */
 export async function fetchTLEData(): Promise<TLEData[]> {
-  const response = await fetch(CELESTRAK_URL);
+  // Primary: HF dataset
+  try {
+    const response = await fetch(HF_TLE_URL);
+    if (response.ok) {
+      const text = await response.text();
+      const data = parseTLEText(text);
+      if (data.length > 0) return data;
+    }
+  } catch {
+    // Fall through to CelesTrak
+  }
+
+  // Fallback: CelesTrak
+  const response = await fetch(CELESTRAK_FALLBACK_URL);
   if (!response.ok) {
     throw new Error(`Failed to fetch TLE data: ${response.status} ${response.statusText}`);
   }
-
   const text = await response.text();
   return parseTLEText(text);
 }
