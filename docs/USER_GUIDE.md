@@ -209,8 +209,8 @@ Data is stored in `data/fleet.db` (SQLite, gitignored). The complete dataset is 
 
 | Data | Source | Update Frequency |
 |---|---|---|
-| Satellite positions | CelesTrak NORAD TLEs + SGP4 propagation | Every 6 hours (TLE fetch), 60 FPS (propagation) |
-| GPS satellites | CelesTrak GPS TLEs | Every 6 hours |
+| Satellite positions | HF dataset ([juliensimon/starlink-tle-latest](https://huggingface.co/datasets/juliensimon/starlink-tle-latest)) + SGP4 propagation | Every 6 hours (TLE fetch), 60 FPS (propagation) |
+| GPS satellites | HF dataset ([juliensimon/starlink-tle-latest](https://huggingface.co/datasets/juliensimon/starlink-tle-latest), GPS config) | Every 6 hours |
 | Ground stations | HF dataset ([juliensimon/starlink-ground-stations](https://huggingface.co/datasets/juliensimon/starlink-ground-stations)) | Daily (automated pipeline) |
 | Dish telemetry | gRPC API (live) or simulation (demo) | Every 1 second |
 | Network path | System traceroute | Every 60 seconds (live only) |
@@ -226,7 +226,7 @@ npm run build        # Production build
 npm run start        # Production server
 npm run test         # Run test suite
 npm run update-gs    # Refresh ground station database from public sources
-npm run ingest       # Ingest latest TLEs from CelesTrak into fleet database
+npm run ingest       # Ingest latest TLEs into fleet database
 ```
 
 ---
@@ -234,7 +234,7 @@ npm run ingest       # Ingest latest TLEs from CelesTrak into fleet database
 ## Troubleshooting
 
 **"ACQUIRING SIGNAL..." stays on screen**
-TLE data is loading from CelesTrak. Check your internet connection. If CelesTrak is unreachable, cached data will be used if available.
+TLE data is loading from the HF dataset (with CelesTrak as fallback). Check your internet connection. If both sources are unreachable, cached data will be used if available.
 
 **No satellite connection beam showing**
 The dish location may not have any satellites in the steering cone at this moment. Wait — satellite passes are typically 15-90 seconds apart. Check that `NEXT_PUBLIC_DISH_LAT` and `NEXT_PUBLIC_DISH_LON` are set correctly.

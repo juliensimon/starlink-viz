@@ -11,7 +11,7 @@
 
 | Source                       | Type          | What it provides                                                                               | Reference                                                                                         |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **CelesTrak / NORAD**        | Public        | Two-Line Element sets (TLEs) — orbital parameters for every tracked Starlink & GPS satellite   | [celestrak.org/NORAD/elements](https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle) |
+| **HF TLE Dataset / NORAD**   | Public        | Two-Line Element sets (TLEs) — orbital parameters for every tracked Starlink & GPS satellite   | [juliensimon/starlink-tle-latest](https://huggingface.co/datasets/juliensimon/starlink-tle-latest) (CelesTrak fallback) |
 | **Starlink dish gRPC API**   | Local device  | Real-time telemetry from your own dish (signal quality, throughput, ping, antenna orientation) | [starlink-grpc-tools (GitHub)](https://github.com/sparky8512/starlink-grpc-tools)                 |
 | **System traceroute / DNS**  | Local network | Network path analysis — which internet exit point your traffic uses                            | Standard network utilities                                                                        |
 | **FCC / ITU filings**        | Public        | Ground station locations (cross-referenced with community research)                            | [FCC IBFS via fcc.report](https://fcc.report); [ARCEP](https://www.arcep.fr); [Ofcom](https://www.ofcom.org.uk) |
@@ -72,7 +72,7 @@ Key details:
 
 ### 1. Orbital Propagation — Verified ✓
 
-**Data source:** Real NORAD TLEs from CelesTrak, propagated with SGP4 via [`satellite.js`](https://github.com/shashwatak/satellite-js).
+**Data source:** Real NORAD TLEs from HF dataset [`juliensimon/starlink-tle-latest`](https://huggingface.co/datasets/juliensimon/starlink-tle-latest) (CelesTrak fallback), propagated with SGP4 via [`satellite.js`](https://github.com/shashwatak/satellite-js).
 
 **Implementation:** `src/lib/satellites/propagator.ts` — uses `satellite.js` to run SGP4, writes positions into a shared `Float32Array` for instanced rendering. Propagation is batched (1/6 of the constellation per frame) for performance.
 
@@ -141,11 +141,11 @@ The app assumes the dish can electronically steer its beam within a **25° cone*
 
 ### 5. TLE Data Source — Verified ✓
 
-**Data source:** [CelesTrak](https://celestrak.org) — the standard public source for satellite orbital data, maintained by Dr. T.S. Kelso.
+**Data source:** HF dataset [`juliensimon/starlink-tle-latest`](https://huggingface.co/datasets/juliensimon/starlink-tle-latest) — raw TLE files sourced daily from [CelesTrak](https://celestrak.org) (Dr. T.S. Kelso) via an automated pipeline in [juliensimon/space-datasets](https://github.com/juliensimon/space-datasets). CelesTrak is retained as a fallback if the HF dataset is unreachable.
 
-**Implementation:** `src/lib/satellites/tle-fetcher.ts` — fetches from `celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle`, parsed by `src/app/api/tle/route.ts`. The client-side hook (`src/hooks/useSatellites.ts`) retries with exponential backoff (1s, 2s, 4s).
+**Implementation:** `src/lib/satellites/tle-fetcher.ts` — fetches raw TLE text from the HF dataset (falling back to CelesTrak), parsed by `src/app/api/tle/route.ts`. GPS TLEs use the same dataset's `gps.tle` file via `src/app/api/tle-gps/route.ts`. The client-side hook (`src/hooks/useSatellites.ts`) retries with exponential backoff (1s, 2s, 4s). Both routes cache in-memory for 6 hours.
 
-The app fetches ~10,000 Starlink satellite TLEs. CelesTrak updates its data roughly twice daily from NORAD. The app tracks when TLEs were last fetched and displays TLE age in the status bar.
+The app fetches ~10,000 Starlink satellite TLEs. The HF dataset is updated daily at 05:00 UTC from CelesTrak, which itself updates roughly twice daily from NORAD. The app tracks when TLEs were last fetched and displays TLE age in the status bar.
 
 **Gap:** TLEs don't tell you whether a satellite is operational, still raising its orbit to the right altitude, maneuvering, or being deorbited. The app uses **per-shell altitude bands** (defined in `src/lib/config.ts`) to estimate operational status based on whether a satellite is near its shell's target altitude.
 
@@ -185,7 +185,7 @@ This is a heuristic with known limitations:
 
 - **False positives:** Failed satellites at operational altitude stay there for months before drag brings them down — the altitude filter counts them as "operational" even though they're not serving traffic.
 - **Orbit-raising satellites:** Newly launched satellites at ~280 km are correctly excluded, but satellites mid-climb (e.g., 400–460 km) are also excluded even if they may already be serving traffic during ascent.
-- **Non-commercial objects:** The CelesTrak "Starlink" group may include Starshield (military/government) objects that NORAD catalogs alongside commercial Starlink satellites. These operate under different parameters and may be at non-standard altitudes, particularly in the 97.6° polar shell.
+- **Non-commercial objects:** The CelesTrak "Starlink" TLE group (used as the upstream source for the HF dataset) may include Starshield (military/government) objects that NORAD catalogs alongside commercial Starlink satellites. These operate under different parameters and may be at non-standard altitudes, particularly in the 97.6° polar shell.
 - **Filed vs observed drift:** The observed altitudes may shift over time as SpaceX adjusts the constellation. The bands should be periodically validated against current TLE data.
 - **Future VLEO conflict:** When SpaceX populates the authorized VLEO shells (340–365 km), the 460 km lower bound will become ambiguous — a satellite at 360 km could be orbit-raising to 570 km or operating in a VLEO shell. This will require new discrimination logic (likely by launch date or NORAD ID range).
 
@@ -676,7 +676,7 @@ The following simulation parameters have **no FCC filing or public SpaceX specif
 | What you see                     | Where it comes from                          | How trustworthy                                                     |
 | -------------------------------- | -------------------------------------------- | ------------------------------------------------------------------- |
 | **Satellite positions**          | Public NORAD data + SGP4 math                | **Real** — same method everyone uses, ~1 km accuracy                |
-| **Number of satellites**         | CelesTrak catalog                            | **Real** — includes some non-operational objects                    |
+| **Number of satellites**         | HF dataset (from CelesTrak catalog)          | **Real** — includes some non-operational objects                    |
 | **Globe, coordinates, geometry** | WGS-84 standard + textbook math              | **Real** — zero assumptions                                         |
 | **Dish stats (live mode)**       | Your dish's hardware API                     | **Real** — straight from the hardware                               |
 | **Network path (live mode)**     | Traceroute + DNS lookup                      | **Real** — actual network measurement                               |
