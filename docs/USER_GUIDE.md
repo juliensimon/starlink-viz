@@ -98,7 +98,7 @@ The main view shows Earth with the full Starlink constellation (~10,000 tracked 
 
 **Satellite Link** — Currently connected satellite name, NORAD ID, azimuth, elevation, altitude, orbital velocity, gateway, PoP location. In live mode, shows a **confidence indicator** (green/yellow/red) comparing measured ping to geometric latency — a large delta suggests the satellite guess may be wrong or traffic is ISL-routed.
 
-**Starlink Network** — Connection health (DEMO/LIVE mode, TLE data age, WebSocket status), per-shell satellite counts (operational/total/percentage for each of the 5 orbital shells), gateway counts (operational + planned), and handoff tracking (count, last handoff time, unique satellites seen).
+**Starlink Network** — Connection health (DEMO/LIVE mode, TLE data age, WebSocket status), per-shell satellite counts (operational/total/percentage for each of the 5 orbital shells), gateway counts (operational + planned), and handoff tracking (count, last handoff time, unique satellites seen). A "Fleet Health →" link below the shell stats navigates to the [Fleet Monitor](#fleet-monitor) for deeper constellation analysis.
 
 #### Top-Right: Controls
 
