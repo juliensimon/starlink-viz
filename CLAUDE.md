@@ -57,7 +57,7 @@ Single-page app with a full-viewport 3D canvas and HUD overlay:
   - `StatusBar` — connection state, uptime, quality, firmware, GPS
   - `TelemetryPanel` — sparkline charts for ping, DL, UL, SNR
   - `SatelliteInfoPanel` — satellite link info, gateway, PoP, route type (Direct/ISL), latency confidence indicator
-  - `HandoffPanel` — titled "Starlink Network": LIVE/TLE/WS indicators, per-shell satellite stats (operational/total/%), gateway counts, handoff tracking
+  - `HandoffPanel` — titled "Starlink Network": LIVE/TLE/WS indicators, per-shell satellite stats (operational/total/%), gateway counts, handoff tracking, "Fleet Health →" link to `/fleet`
   - `SkyHud` — sky view stats: sun elevation, satellite counts (sunlit/shadow), UTC time, daytime warning
   - `EventLog`, `ViewControls` (Space/Sky toggle, demo/live, rotate, altitude filter, ISL), `ColorLegend`
 - **WebSocket client** (`src/components/WebSocketManager.tsx`) — receives messages and dispatches to stores
