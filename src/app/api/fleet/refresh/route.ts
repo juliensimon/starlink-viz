@@ -1,75 +1,53 @@
-import { spawn } from 'child_process';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { clearCache } from '@/lib/fleet/hf-dataset';
 
+const REPO = 'juliensimon/starlink-fleet-data';
+const DATASET_DIR = join(process.cwd(), 'data/dataset/data');
+const FILES = ['daily_snapshots.parquet', 'tle_snapshots.parquet', 'latest_satellites.parquet'];
+
 /**
- * SSE endpoint — streams download progress from `hf download`.
- * Client connects with EventSource, receives progress events, then 'done'/'error'.
+ * SSE endpoint — downloads parquet files from HF Hub via HTTP API.
+ * No `hf` CLI dependency — works in Docker containers.
  */
 export async function POST() {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
-    start(controller) {
+    async start(controller) {
       function send(event: string, data: string) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
       }
 
-      send('progress', 'Connecting to HF...');
+      try {
+        send('progress', 'Connecting to HF...');
+        await mkdir(DATASET_DIR, { recursive: true });
 
-      const proc = spawn('hf', [
-        'download', 'juliensimon/starlink-fleet-data',
-        '--repo-type', 'dataset',
-        '--local-dir', 'data/dataset',
-      ], { timeout: 120000 });
+        for (let i = 0; i < FILES.length; i++) {
+          const file = FILES[i];
+          send('progress', `Downloading ${i + 1}/${FILES.length}: ${file}`);
 
-      let lastProgress = '';
+          const url = `https://huggingface.co/datasets/${REPO}/resolve/main/data/${file}`;
+          const res = await fetch(url, { redirect: 'follow' });
 
-      // hf download writes progress to stderr
-      proc.stderr?.on('data', (chunk: Buffer) => {
-        const text = chunk.toString().trim();
-        if (!text) return;
+          if (!res.ok) {
+            send('error', `Failed to download ${file}: ${res.status} ${res.statusText}`);
+            controller.close();
+            return;
+          }
 
-        // Parse progress percentage from hf download output
-        // Format: "Fetching 5 files: 60%|██████    | 3/5 [00:01<00:00, 2.13it/s]"
-        const pctMatch = text.match(/(\d+)%\|/);
-        const fileMatch = text.match(/(\d+)\/(\d+)/);
-
-        let msg: string;
-        if (pctMatch && fileMatch) {
-          msg = `Downloading: ${pctMatch[1]}% (${fileMatch[1]}/${fileMatch[2]} files)`;
-        } else if (text.includes('Download complete')) {
-          msg = text.replace(/.*Download complete\.\s*/, 'Downloaded: ').replace(/Moving file to /, '');
-        } else if (text.includes('Fetching')) {
-          msg = text.replace(/\|.*/, '').trim();
-        } else {
-          msg = text.slice(0, 80);
+          const buf = Buffer.from(await res.arrayBuffer());
+          await writeFile(join(DATASET_DIR, file), buf);
+          send('progress', `Downloaded ${file} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
         }
 
-        if (msg !== lastProgress) {
-          lastProgress = msg;
-          send('progress', msg);
-        }
-      });
-
-      proc.stdout?.on('data', (chunk: Buffer) => {
-        const text = chunk.toString().trim();
-        if (text) send('progress', text.slice(0, 80));
-      });
-
-      proc.on('close', async (code) => {
-        if (code === 0) {
-          send('progress', 'Clearing cache...');
-          await clearCache();
-          send('done', 'Dataset refreshed');
-        } else {
-          send('error', `hf download exited with code ${code}`);
-        }
+        send('progress', 'Clearing cache...');
+        await clearCache();
+        send('done', 'Dataset refreshed');
+      } catch (err) {
+        send('error', err instanceof Error ? err.message : String(err));
+      } finally {
         controller.close();
-      });
-
-      proc.on('error', (err) => {
-        send('error', err.message);
-        controller.close();
-      });
+      }
     },
   });
 
