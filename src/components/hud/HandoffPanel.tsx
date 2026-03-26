@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { useHandoff } from '@/hooks/useHandoff';
 import { useAppStore } from '@/stores/app-store';
 import { getFullCatalog } from '@/lib/satellites/satellite-store';
@@ -206,6 +207,12 @@ export default function HandoffPanel() {
               </span>
             </div>
           </div>
+          <Link
+            href="/fleet"
+            className="block text-[9px] text-cyan-400/50 hover:text-cyan-400 transition-colors mt-1.5 text-right"
+          >
+            Fleet Health →
+          </Link>
         </>
       )}
 
