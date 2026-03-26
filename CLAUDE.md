@@ -28,8 +28,8 @@ Custom HTTP server wrapping Next.js that handles:
 
 ### API Routes (`src/app/api/`)
 
-- `/api/tle` — CelesTrak Starlink TLE data (6h in-memory cache)
-- `/api/tle-gps` — GPS constellation TLE data
+- `/api/tle` — Starlink TLE data from HF dataset `juliensimon/starlink-tle-latest` (CelesTrak fallback, 6h cache)
+- `/api/tle-gps` — GPS TLE data from HF dataset `juliensimon/starlink-tle-latest` (CelesTrak fallback, 6h cache)
 - `/api/ground-stations` — gateway catalog from HF dataset `juliensimon/starlink-ground-stations` (via `refreshGroundStations()`)
 - `/api/pop` — public IP + rDNS PoP city detection (5m cache)
 - `/api/isl-log` — ISL route decision log (GET last 100 lines / POST append)
