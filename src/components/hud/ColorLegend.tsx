@@ -15,7 +15,7 @@ const ITEMS: { color: string; label: string; desc: string; opacity?: number }[] 
 
 export default function ColorLegend() {
   return (
-    <div className="hud-panel p-3 w-[160px]">
+    <div className="hud-panel p-3 w-full md:w-[160px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-2">
         Legend
       </div>

@@ -24,7 +24,7 @@ const CARDS: Array<{ key: keyof SummaryData; label: string; color: string; descr
 
 export function SummaryStrip({ data }: SummaryStripProps) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
       {CARDS.map(({ key, label, color, description }) => (
         <div
           key={key}

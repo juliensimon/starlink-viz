@@ -29,14 +29,14 @@ export default function EventLog() {
   };
 
   return (
-    <div className="hud-panel p-3 w-[600px]">
+    <div className="hud-panel p-3 w-full md:w-[600px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-2">
         Event Log
       </div>
 
       <div
         ref={scrollRef}
-        className="h-[120px] overflow-y-auto space-y-0.5 scrollbar-thin"
+        className="h-[200px] md:h-[120px] overflow-y-auto space-y-0.5 scrollbar-thin"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: 'rgba(0,255,255,0.2) transparent',
@@ -46,7 +46,7 @@ export default function EventLog() {
           <div className="text-[11px] text-white/30 italic">No events yet...</div>
         ) : (
           events.map((event, i) => (
-            <div key={i} className="flex gap-2 text-[11px] leading-relaxed whitespace-nowrap">
+            <div key={i} className="flex gap-2 text-[11px] leading-relaxed whitespace-normal md:whitespace-nowrap">
               <span className="text-white/30 tabular-nums flex-shrink-0">
                 {formatTimestamp(event.timestamp)}
               </span>

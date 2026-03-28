@@ -57,6 +57,26 @@ body {
   opacity: 0.4;
 }
 
+/* Mobile HUD drawer */
+.hud-drawer {
+  background: rgba(10, 14, 26, 0.92);
+  border-top: 1px solid var(--color-accent-dim);
+  backdrop-filter: blur(12px);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fleet page responsive grid */
+.fleet-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  .fleet-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
 /* Scanline overlay effect */
 .hud-scanlines::after {
   content: '';

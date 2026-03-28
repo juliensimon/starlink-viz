@@ -138,19 +138,20 @@ export function FleetPage() {
     : null);
 
   return (
-    <div style={{ background: '#0a0a0f', color: '#fff', minHeight: '100vh', padding: 16, overflow: 'auto', height: '100vh' }}>
+    <div style={{ background: '#0a0a0f', color: '#fff', minHeight: '100vh', padding: 'clamp(10px, 2vw, 16px)', overflow: 'auto', height: '100vh' }}>
       {/* Top bar */}
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: '8px 16px',
           borderBottom: '1px solid rgba(255,255,255,0.1)',
           paddingBottom: 12,
           marginBottom: 16,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: '1 1 auto', minWidth: 200 }}>
           <span style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 'bold' }}>STARLINK FLEET</span>
           <Link
             href="/"
@@ -159,7 +160,7 @@ export function FleetPage() {
             &larr; Back to Globe
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: '1 1 auto', justifyContent: 'flex-end', fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
           {lastIngest && <span>Last: {new Date(lastIngest).toLocaleDateString()}</span>}
           <span>{recordCount.toLocaleString()} days</span>
           {refreshMsg && (
@@ -177,7 +178,8 @@ export function FleetPage() {
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: 4,
-              padding: '3px 8px',
+              padding: '6px 12px',
+              minHeight: 36,
               cursor: refreshing ? 'wait' : 'pointer',
             }}
           >
@@ -193,7 +195,7 @@ export function FleetPage() {
 
       {/* Charts */}
       {recordCount > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+        <div className="fleet-grid">
           {/* Row 1: Growth (wide) + Shell Fill (narrow) */}
           <ConstellationGrowth />
           <ShellFillRate shells={shells} />

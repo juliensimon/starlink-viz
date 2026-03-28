@@ -82,7 +82,7 @@ export default function SkyHud() {
   if (cameraMode !== 'sky' || !stats) return null;
 
   return (
-    <div className="hud-panel p-3 w-[240px]">
+    <div className="hud-panel p-3 w-full max-w-[240px] md:w-[240px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-2">
         Sky View
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore, DEMO_LOCATIONS } from '@/stores/app-store';
 
 export default function ViewControls() {
@@ -17,6 +17,8 @@ export default function ViewControls() {
   const demoLocation = useAppStore((s) => s.demoLocation);
   const setDemoLocation = useAppStore((s) => s.setDemoLocation);
   const [switching, setSwitching] = useState(false);
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => { setIsTouch('ontouchstart' in window); }, []);
 
   const toggleMode = async () => {
     setSwitching(true);
@@ -36,7 +38,7 @@ export default function ViewControls() {
   };
 
   return (
-    <div className="hud-panel p-3 w-[280px]">
+    <div className="hud-panel p-3 w-full md:w-[280px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-2">
         Controls
       </div>
@@ -44,7 +46,7 @@ export default function ViewControls() {
       {/* Space/Sky view toggle */}
       <button
         onClick={() => setCameraMode(cameraMode === 'space' ? 'sky' : 'space')}
-        className="flex items-center gap-2 w-full text-left mb-2 group"
+        className="flex items-center gap-2 w-full text-left mb-2 group min-h-[44px] md:min-h-0"
       >
         <div
           className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
@@ -71,7 +73,7 @@ export default function ViewControls() {
       <button
         onClick={toggleMode}
         disabled={switching}
-        className="flex items-center gap-2 w-full text-left mb-2 group"
+        className="flex items-center gap-2 w-full text-left mb-2 group min-h-[44px] md:min-h-0"
       >
         <div
           className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
@@ -97,7 +99,7 @@ export default function ViewControls() {
       {/* Auto-rotate toggle */}
       <button
         onClick={() => setAutoRotate(!autoRotate)}
-        className="flex items-center gap-2 w-full text-left mb-2 group"
+        className="flex items-center gap-2 w-full text-left mb-2 group min-h-[44px] md:min-h-0"
       >
         <div
           className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
@@ -121,7 +123,7 @@ export default function ViewControls() {
       {/* Altitude filter toggle */}
       <button
         onClick={() => setAltitudeFilter(!altitudeFilter)}
-        className="flex items-center gap-2 w-full text-left mb-2 group"
+        className="flex items-center gap-2 w-full text-left mb-2 group min-h-[44px] md:min-h-0"
       >
         <div
           className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
@@ -145,7 +147,7 @@ export default function ViewControls() {
       {/* ISL Prediction toggle */}
       <button
         onClick={() => setISLPrediction(!islPrediction)}
-        className="flex items-center gap-2 w-full text-left mb-2 group"
+        className="flex items-center gap-2 w-full text-left mb-2 group min-h-[44px] md:min-h-0"
       >
         <div
           className={`w-7 h-3.5 rounded-full transition-colors duration-200 flex items-center ${
@@ -197,7 +199,7 @@ export default function ViewControls() {
       {/* Focus dish button */}
       <button
         onClick={focusDish}
-        className="flex items-center gap-2 w-full text-left group"
+        className="flex items-center gap-2 w-full text-left group min-h-[44px] md:min-h-0"
       >
         <svg
           width="14"
@@ -223,13 +225,13 @@ export default function ViewControls() {
       {/* Interaction legend */}
       <div className="space-y-1 text-[10px] text-white/40">
         <div className="flex justify-between">
-          <span>Drag</span><span>Rotate</span>
+          <span>{isTouch ? 'Touch drag' : 'Drag'}</span><span>Rotate</span>
         </div>
         <div className="flex justify-between">
-          <span>Scroll</span><span>Zoom</span>
+          <span>{isTouch ? 'Pinch' : 'Scroll'}</span><span>Zoom</span>
         </div>
         <div className="flex justify-between">
-          <span>Double-click</span><span>Focus</span>
+          <span>{isTouch ? 'Double-tap' : 'Double-click'}</span><span>Focus</span>
         </div>
       </div>
     </div>
