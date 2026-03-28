@@ -45,7 +45,7 @@ export default function TelemetryPanel() {
   const ulHistory = history.uplink.map(bytesToMbps);
 
   return (
-    <div className="hud-panel p-4 w-[280px]">
+    <div className="hud-panel p-4 w-full md:w-[280px]">
       <div className="text-[10px] uppercase tracking-[0.15em] text-cyan-400/60 mb-3">
         Telemetry
       </div>

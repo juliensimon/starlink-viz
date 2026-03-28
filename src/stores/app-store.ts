@@ -39,6 +39,7 @@ interface AppState {
   islPrediction: boolean;
   demoLocation: DemoLocation | null;
   cameraMode: 'space' | 'sky';
+  mobileHudTab: 'status' | 'controls' | 'network' | 'events' | null;
 
   setSelectedSatellite: (index: number | null) => void;
   setConnectedSatellite: (index: number | null) => void;
@@ -55,6 +56,7 @@ interface AppState {
   setISLPrediction: (enabled: boolean) => void;
   setDemoLocation: (location: DemoLocation | null) => void;
   setCameraMode: (mode: 'space' | 'sky') => void;
+  setMobileHudTab: (tab: 'status' | 'controls' | 'network' | 'events' | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -73,6 +75,7 @@ export const useAppStore = create<AppState>((set) => ({
   islPrediction: true,
   demoLocation: null,
   cameraMode: 'space',
+  mobileHudTab: null,
 
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
@@ -96,4 +99,5 @@ export const useAppStore = create<AppState>((set) => ({
   setISLPrediction: (enabled) => set({ islPrediction: enabled }),
   setDemoLocation: (location) => set({ demoLocation: location }),
   setCameraMode: (mode) => set({ cameraMode: mode }),
+  setMobileHudTab: (tab) => set({ mobileHudTab: tab }),
 }));
