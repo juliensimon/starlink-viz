@@ -40,6 +40,7 @@ function ensureBeamGSData() {
     operationalGSIndices = GROUND_STATIONS
       .map((gs, i) => (gs.status !== 'planned' ? i : -1))
       .filter((i) => i >= 0);
+    lastGSIndex = -1; // reset on refresh so stale index doesn't outlive the old array
     beamGSVersion = groundStationsVersion;
   }
 }
@@ -55,8 +56,9 @@ let lastComputedLatencyMs = 0;
 // Find the nearest ground station to the satellite, with hysteresis to
 // prevent rapid flickering between two equidistant stations. When a new
 // GS is selected, logs a gateway-switch event with the latency delta.
-function findNearestGS3D(satPos: THREE.Vector3): THREE.Vector3 {
+function findNearestGS3D(satPos: THREE.Vector3): THREE.Vector3 | null {
   ensureBeamGSData();
+  if (operationalGSIndices.length === 0) return null;
   let nearest = gsPositions[operationalGSIndices[0]];
   let nearestIdx = operationalGSIndices[0];
   let minDist = Infinity;
@@ -454,6 +456,9 @@ export default function ConnectionBeam() {
     const positions = getPositionsArray();
     if (!positions) return;
 
+    ensureBeamGSData();
+    if (operationalGSIndices.length === 0) return; // GS data not loaded yet
+
     const now = performance.now();
     const appState = useAppStore.getState();
     const islEnabled = appState.islPrediction;
@@ -577,7 +582,7 @@ export default function ConnectionBeam() {
 
     // Determine the final satellite and ground station for the downlink beam
     let lastSatVec = _satPos;
-    let gsVec: THREE.Vector3;
+    let gsVec: THREE.Vector3 | null = null;
 
     if (isISLRoute) {
       // Render ISL hop beams (green straight lines)
@@ -647,6 +652,7 @@ export default function ConnectionBeam() {
     }
 
     // Last satellite → ground station beam (orange)
+    if (!gsVec) return; // ground stations not loaded yet
     const gsPosAttr = gsBeamLine.geometry.getAttribute('position') as THREE.BufferAttribute;
     writeCurvePoints(lastSatVec, gsVec, 1.2, gsPosAttr.array as Float32Array, BEAM_SEGMENTS);
     gsPosAttr.needsUpdate = true;
