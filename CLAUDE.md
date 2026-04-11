@@ -93,7 +93,7 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 - **Latency model** — speed-of-light geometry + 6ms base processing RTT + 0.3ms OEO per ISL hop + per-GS backhaul
 - **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 - **Toggle** — `islPrediction` in app-store, green pill-switch in ViewControls
-- **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
+- **Demo locations** — 7 locations selectable in ViewControls (demo mode only). 6 ocean locations force mandatory ISL (Iceland Gap, N/Mid Atlantic ×2, Gulf of Mexico, Celtic Sea, Point Nemo); Lorgues, France is a direct-routing contrast. Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
 
 ### Ground Stations (HF dataset)
 

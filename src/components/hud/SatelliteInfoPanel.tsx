@@ -172,16 +172,26 @@ export default function SatelliteInfoPanel() {
       })()}
 
       {/* ISL route info */}
-      {islPrediction && routeType && (
+      {islPrediction && hasConnection && (
         <>
           <hr className="hud-divider my-2" />
-          <div className="flex justify-between items-center mb-1" title={routeType === 'isl' ? `Traffic routes through ${hopCount} inter-satellite laser hops` : 'Direct bent-pipe route to nearest ground station'}>
+          <div className="flex justify-between items-center mb-1" title={
+            !routeType ? 'No ISL path found — satellite cannot reach any gateway within LoS'
+            : routeType === 'isl' ? `Traffic routes through ${hopCount} inter-satellite laser hops`
+            : 'Direct bent-pipe route to nearest ground station'
+          }>
             <span className="text-[11px] text-white/50">Route</span>
             <div className="flex items-center gap-1.5">
-              <span className={`inline-block w-2 h-2 rounded-full ${routeType === 'isl' ? 'bg-green-400' : 'bg-cyan-400'}`} />
-              <span className="text-[10px] text-white/50 tabular-nums">
-                {routeType === 'isl' ? `ISL (${hopCount} hop${hopCount !== 1 ? 's' : ''})` : 'Direct'}
-              </span>
+              {routeType ? (
+                <>
+                  <span className={`inline-block w-2 h-2 rounded-full ${routeType === 'isl' ? 'bg-green-400' : 'bg-cyan-400'}`} />
+                  <span className="text-[10px] text-white/50 tabular-nums">
+                    {routeType === 'isl' ? `ISL (${hopCount} hop${hopCount !== 1 ? 's' : ''})` : 'Direct'}
+                  </span>
+                </>
+              ) : (
+                <span className="text-[10px] text-red-400/70 tabular-nums">No path</span>
+              )}
             </div>
           </div>
           {routeType === 'isl' && routingGS && routingGS !== gateway && (

@@ -61,6 +61,7 @@ const POP_LOCATIONS: Record<string, { lat: number; lon: number }> = {
   'Singapore, SG':     { lat: 1.3521, lon: 103.8198 },
   'Sydney, AU':        { lat: -33.8688, lon: 151.2093 },
   'Tokyo, JP':         { lat: 35.6762, lon: 139.6503 },
+  'Santiago, CL':      { lat: -33.4489, lon: -70.6693 },
 };
 
 /** Max backhaul distance (km) from a ground station to the PoP.
@@ -256,7 +257,7 @@ function reconstructPath(settled: SearchNode[], nodeIdx: number): number[] {
 
 export interface RouteDecisionEntry {
   time: string;
-  action: 'hold' | 'hold-invalid' | 'new' | 'fallback';
+  action: 'hold' | 'hold-invalid' | 'new' | 'fallback' | 'no-path';
   reason: string;
   route: {
     type: 'direct' | 'isl';
@@ -513,7 +514,18 @@ export function findBestRoute(
       return previousRoute;
     }
 
-    // Genuine fallback — no previous ISL route to hold
+    // When ISL is mandatory, never fall back to an unconstrained GS — the
+    // nearest GS (e.g. Punta Arenas for Point Nemo) may be beyond the
+    // satellite's LoS horizon and the route would be physically impossible.
+    // Clear any stale fallback so the hard-hold below doesn't preserve it.
+    if (islMandatory) {
+      previousRoute = null;
+      previousRouteTime = 0;
+      logRouteDecision({ time: new Date().toISOString(), action: 'no-path', reason: 'ISL mandatory, no path found', route: null, context: logCtx });
+      return null;
+    }
+
+    // Non-ISL fallback: try direct routes first, then unconstrained nearest GS.
     if (directRoutes.length > 0) {
       previousRoute = directRoutes[0];
       previousRouteTime = now;
@@ -533,8 +545,11 @@ export function findBestRoute(
     return null;
   }
 
-  // Hard hold: keep current route unless geometrically invalid
-  if (previousRoute && now - previousRouteTime < ROUTE_HOLD_MS) {
+  // Hard hold: keep current route unless geometrically invalid.
+  // Skip hold when ISL is mandatory but the held route is direct — that
+  // would be a stale phantom route to a beyond-horizon GS.
+  if (previousRoute && now - previousRouteTime < ROUTE_HOLD_MS &&
+      !(islMandatory && previousRoute.type === 'direct')) {
     const exitSatIdx = previousRoute.satelliteIndices[previousRoute.satelliteIndices.length - 1];
     const exitSatPos = posAt(positions, exitSatIdx);
     const exitGSPos = gsPositions[previousRoute.groundStationIndex];

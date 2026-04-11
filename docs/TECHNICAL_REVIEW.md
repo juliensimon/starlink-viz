@@ -342,6 +342,7 @@ Selection runs every **500ms** (not every frame, for performance).
 **ISL neighbor graph** (`src/lib/satellites/isl-graph.ts`):
 - CSR (Compressed Sparse Row) encoded graph rebuilt every 30 seconds
 - Each ISL-capable satellite connects to **4 neighbors** (matching the 4 physical laser terminals): 2 in-plane (nearest neighbors in the same orbital plane) and 2 cross-plane (nearest neighbors in adjacent planes, matched by RAAN)
+- Every satellite attempts a cross-plane link; the 4-terminal cap in `addEdge` is the binding physical constraint. (An earlier sampling approach left ~67% of satellites with no cross-plane links, causing BFS disconnects over remote locations like Point Nemo.)
 - **Polar exclusion** at ±70° latitude — laser links are assumed inactive near the poles where orbital planes converge and relative angular rates become problematic
 - RAAN (Right Ascension of Ascending Node) parsed from TLE data to identify orbital planes
 
@@ -356,7 +357,7 @@ Selection runs every **500ms** (not every frame, for performance).
 - **0.3 ms OEO (optical-electrical-optical) conversion** per ISL hop — each laser terminal receives, processes, and retransmits the signal
 - Per-gateway backhaul RTT from haversine distance to nearest IXP at 0.67c with 1.4× fiber route factor
 
-**Demo locations:** 5 remote locations where ISL is mandatory (Iceland Gap, North Atlantic, Mid-Atlantic, Gulf of Mexico, Celtic Sea) — selectable in ViewControls during demo mode. These demonstrate the ISL routing visualization with colored beam segments (cyan uplink, green ISL hops, orange downlink).
+**Demo locations:** 7 locations selectable in ViewControls during demo mode. 6 ocean locations force mandatory ISL (Iceland Gap, North Atlantic ×2, Gulf of Mexico, Celtic Sea, Point Nemo — the oceanic pole of inaccessibility at −48.9°S/−123.4°W, ~3,960km from the nearest Chilean gateway). Lorgues, France is a direct-routing contrast showing normal European coverage. These demonstrate the ISL routing visualization with colored beam segments (cyan uplink, green ISL hops, orange downlink).
 
 **Why this is still approximate:**
 - There is zero public data about which laser links are actually active at any moment
