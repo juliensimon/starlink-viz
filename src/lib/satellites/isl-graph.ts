@@ -266,10 +266,11 @@ function linkCrossPlane(
   planeA: number[],
   planeB: number[],
 ): void {
-  // Step through planeA at intervals, linking each to its nearest in planeB
-  const step = Math.max(1, Math.floor(planeA.length / 20));
-
-  for (let i = 0; i < planeA.length; i += step) {
+  // Every satellite attempts a cross-plane link. The 4-terminal cap in addEdge
+  // ensures we never exceed physical reality (2 in-plane + 2 cross-plane).
+  // The old step=planeLength/20 left ~67% of satellites with no cross-plane
+  // links, causing BFS disconnects over remote ocean locations like Point Nemo.
+  for (let i = 0; i < planeA.length; i++) {
     const a = planeA[i];
     const pa = a * 3;
     const ax = positions[pa], ay = positions[pa + 1], az = positions[pa + 2];
