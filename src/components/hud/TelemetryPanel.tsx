@@ -36,6 +36,7 @@ export default function TelemetryPanel() {
   const downlink = dishStatus?.downlink ?? 0;
   const uplink = dishStatus?.uplink ?? 0;
   const snr = dishStatus?.snr ?? 0;
+  const snrLabel = snr >= 10 ? 'OK' : 'Low';
 
   const dlMbps = bytesToMbps(downlink);
   const ulMbps = bytesToMbps(uplink);
@@ -74,8 +75,8 @@ export default function TelemetryPanel() {
         />
         <MetricCard
           label="SNR"
-          value={snr.toFixed(1)}
-          unit="dB"
+          value={snrLabel}
+          unit=""
           data={history.snr}
           color="#67e8f9"
         />
