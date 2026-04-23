@@ -1,31 +1,11 @@
-export interface DishStatus {
-  deviceId: string;
-  hardwareVersion: string;
-  softwareVersion: string;
-  state: string; // 'CONNECTED' | 'SEARCHING' | 'BOOTING' | 'UNKNOWN'
-  uptime: number; // seconds
-  snr: number;
-  downlinkThroughput: number; // bytes/s
-  uplinkThroughput: number; // bytes/s
-  popPingLatency: number; // ms
-  popPingDropRate: number; // 0-1
-  obstructionPercentTime: number; // 0-100
-  boresightAzimuth: number; // degrees
-  boresightElevation: number; // degrees
-  gpsSats: number;
-  alerts: string[];
-}
-
-export interface DishHistory {
-  pingLatency: number[];
-  downlinkThroughput: number[];
-  uplinkThroughput: number[];
-  snr: number[];
-}
+export type {
+  DishStatus,
+  DishHistory,
+} from 'starlink-dish';
 
 export interface WSMessage {
   type: 'status' | 'history' | 'handoff' | 'event';
-  data: DishStatus | DishHistory | HandoffEvent | EventLogEntry;
+  data: import('starlink-dish').DishStatus | import('starlink-dish').DishHistory | HandoffEvent | EventLogEntry;
   timestamp: number;
 }
 

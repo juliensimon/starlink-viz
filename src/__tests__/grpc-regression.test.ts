@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMockStatus, generateMockHistory } from '../lib/grpc/mock-data';
+import type { DishStatus as NewDishStatus, DishHistory as NewDishHistory } from 'starlink-dish';
 
 describe('generateMockStatus()', () => {
   it('returns a DishStatus with all required fields', () => {
@@ -45,5 +46,35 @@ describe('generateMockHistory()', () => {
     expect(h.downlinkThroughput).toHaveLength(60);
     expect(h.uplinkThroughput).toHaveLength(60);
     expect(h.snr).toHaveLength(60);
+  });
+});
+
+describe('starlink-dish type contract', () => {
+  it('DishStatus has snrAboveNoiseFloor boolean (not snr number)', () => {
+    const s: NewDishStatus = {
+      deviceId: 'test', hardwareVersion: '4.0', softwareVersion: '1.0',
+      countryCode: 'US', bootcount: 0, uptimeSeconds: 0, state: 'CONNECTED',
+      downlinkThroughputBps: 0, uplinkThroughputBps: 0, popPingLatencyMs: 0,
+      popPingDropRate: 0, obstructionPercentTime: 0, currentlyObstructed: false,
+      snrAboveNoiseFloor: true, snrPersistentlyLow: false,
+      boresightAzimuthDeg: 0, boresightElevationDeg: 0,
+      gpsValid: true, gpsSats: 0, ethSpeedMbps: 0, alerts: [],
+    };
+    expect(typeof s.snrAboveNoiseFloor).toBe('boolean');
+    // @ts-expect-error — old snr field must not exist on new type
+    expect(s.snr).toBeUndefined();
+  });
+
+  it('DishHistory uses pingLatencyMs not pingLatency', () => {
+    const h: NewDishHistory = {
+      current: 0,
+      pingLatencyMs: [25, 30],
+      pingDropRate: [0.001],
+      downlinkThroughputBps: [100_000_000],
+      uplinkThroughputBps: [10_000_000],
+    };
+    expect(h.pingLatencyMs).toHaveLength(2);
+    // @ts-expect-error — old pingLatency field must not exist
+    expect(h.pingLatency).toBeUndefined();
   });
 });
