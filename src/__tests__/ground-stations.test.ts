@@ -58,7 +58,11 @@ describe('findNearestGroundStation', () => {
 
   it('finds a Japanese station for Tokyo-area location', () => {
     const nearest = findNearestGroundStation(35.7, 139.7);
-    expect(nearest.name).toContain('Japan');
+    // Station is named "Tokyo" in the HF dataset
+    expect(nearest.lat).toBeGreaterThan(30);
+    expect(nearest.lat).toBeLessThan(40);
+    expect(nearest.lon).toBeGreaterThan(130);
+    expect(nearest.lon).toBeLessThan(145);
   });
 
   it('uses cosine correction for longitude at high latitudes', () => {

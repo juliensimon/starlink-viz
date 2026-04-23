@@ -35,9 +35,17 @@ export async function refreshGroundStations(): Promise<void> {
     let stations: GroundStation[];
 
     if (typeof window === 'undefined') {
-      // Server — fetch from HF directly
-      const { fetchHFGateways } = await import('./hf-ground-stations');
-      stations = await fetchHFGateways();
+      // Server — fetch from HF directly (gateways + pops in parallel)
+      const { fetchHFGateways, fetchHFPops } = await import('./hf-ground-stations');
+      const [gateways, pops] = await Promise.allSettled([fetchHFGateways(), fetchHFPops()]);
+
+      stations = gateways.status === 'fulfilled' ? gateways.value : [];
+
+      if (pops.status === 'fulfilled') {
+        for (const p of pops.value) {
+          stations.push({ name: p.city, lat: p.lat, lon: p.lon, status: 'operational', type: 'pop' });
+        }
+      }
     } else {
       // Client — fetch from our API (server already has HF data)
       const res = await fetch('/api/ground-stations');
