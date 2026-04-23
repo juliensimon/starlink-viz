@@ -71,6 +71,7 @@ function mapRowToStation(row: Record<string, unknown>): GroundStation {
     lat: Number(row.lat),
     lon: Number(row.lon),
     status: (row.status as GroundStation['status']) ?? 'operational',
+    type: (row.type as GroundStation['type']) ?? 'gateway',
   };
 }
 
