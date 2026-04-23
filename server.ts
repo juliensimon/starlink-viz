@@ -4,15 +4,14 @@ import { promisify } from 'util';
 import next from 'next';
 import { parse } from 'url';
 import { createWSServer, broadcast } from './src/lib/websocket/server';
-import { initGrpcClient, getStatus, getHistory, closeGrpcClient } from './src/lib/grpc/client';
-import { generateMockStatus, generateMockHistory } from './src/lib/grpc/mock-data';
+import { initClient, getStatus, getHistory, closeClient, useMock } from 'starlink-dish';
 import {
   createStatusMessage,
   createHistoryMessage,
   createHandoffMessage,
   createEventMessage,
 } from './src/lib/websocket/protocol';
-import type { DishStatus } from './src/lib/grpc/types';
+import type { DishStatus } from 'starlink-dish';
 import { parsePopHostname } from './src/lib/utils/pop';
 import { runTraceroute } from './src/lib/utils/traceroute';
 
@@ -31,6 +30,7 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 let useDemoMode = false;
+let mockInstalled = false;
 let startTime = Date.now();
 let previousStatus: DishStatus | null = null;
 let statusInterval: ReturnType<typeof setInterval> | null = null;
@@ -87,7 +87,7 @@ async function detectDishAvailability(): Promise<boolean> {
   if (demoModeEnv === 'false') {
     console.log(`\u{1F4E1} Real mode forced via DEMO_MODE=false`);
     console.log(`\u{1F50D} Connecting to dish at ${dishAddress}...`);
-    const connected = await initGrpcClient(dishAddress);
+    const connected = await initClient(dishAddress);
     if (!connected) {
       console.error(`\u{274C} Failed to connect to dish at ${dishAddress}`);
     }
@@ -96,7 +96,7 @@ async function detectDishAvailability(): Promise<boolean> {
 
   // Auto-detect: try connecting to the dish
   console.log(`\u{1F50D} Auto-detecting dish at ${dishAddress}...`);
-  const connected = await initGrpcClient(dishAddress);
+  const connected = await initClient(dishAddress);
   if (connected) {
     console.log(`\u{1F4E1} Connected to dish at ${dishAddress}`);
     return true;
@@ -112,23 +112,23 @@ function detectHandoff(current: DishStatus): void {
     return;
   }
 
-  const azDelta = Math.abs(current.boresightAzimuth - previousStatus.boresightAzimuth);
-  const elDelta = Math.abs(current.boresightElevation - previousStatus.boresightElevation);
+  const azDelta = Math.abs(current.boresightAzimuthDeg - previousStatus.boresightAzimuthDeg);
+  const elDelta = Math.abs(current.boresightElevationDeg - previousStatus.boresightElevationDeg);
 
   if (azDelta > HANDOFF_THRESHOLD_DEG || elDelta > HANDOFF_THRESHOLD_DEG) {
     broadcast(
       createHandoffMessage({
-        previousAzimuth: previousStatus.boresightAzimuth,
-        previousElevation: previousStatus.boresightElevation,
-        newAzimuth: current.boresightAzimuth,
-        newElevation: current.boresightElevation,
+        previousAzimuth: previousStatus.boresightAzimuthDeg,
+        previousElevation: previousStatus.boresightElevationDeg,
+        newAzimuth: current.boresightAzimuthDeg,
+        newElevation: current.boresightElevationDeg,
       })
     );
 
     broadcast(
       createEventMessage({
         timestamp: Date.now(),
-        message: `Satellite handoff: az ${previousStatus.boresightAzimuth.toFixed(1)}\u00B0 \u2192 ${current.boresightAzimuth.toFixed(1)}\u00B0, el ${previousStatus.boresightElevation.toFixed(1)}\u00B0 \u2192 ${current.boresightElevation.toFixed(1)}\u00B0`,
+        message: `Satellite handoff: az ${previousStatus.boresightAzimuthDeg.toFixed(1)}\u00B0 \u2192 ${current.boresightAzimuthDeg.toFixed(1)}\u00B0, el ${previousStatus.boresightElevationDeg.toFixed(1)}\u00B0 \u2192 ${current.boresightElevationDeg.toFixed(1)}\u00B0`,
         type: 'handoff',
       })
     );
@@ -140,18 +140,18 @@ function detectHandoff(current: DishStatus): void {
 async function pollStatus(): Promise<void> {
   let status: DishStatus | null = null;
 
-  if (useDemoMode) {
-    const elapsed = Date.now() - startTime;
-    status = generateMockStatus(elapsed);
-  } else {
+  if (useDemoMode && !mockInstalled) {
+    useMock();
+    mockInstalled = true;
+  }
+  status = await getStatus();
+  if (!useDemoMode && !status) {
+    // Dish became unreachable, fallback to demo mode
+    console.warn('\u26A0\uFE0F Dish unreachable, falling back to demo mode');
+    useDemoMode = true;
+    useMock();
+    mockInstalled = true;
     status = await getStatus();
-    if (!status) {
-      // Dish became unreachable, fallback to demo mode
-      console.warn('\u26A0\uFE0F Dish unreachable, falling back to demo mode');
-      useDemoMode = true;
-      const elapsed = Date.now() - startTime;
-      status = generateMockStatus(elapsed);
-    }
   }
 
   if (status) {
@@ -161,12 +161,12 @@ async function pollStatus(): Promise<void> {
       detectHandoff(status);
 
       // Log live dish data to console
-      const dl = ((status.downlinkThroughput * 8) / 1_000_000).toFixed(1);
-      const ul = ((status.uplinkThroughput * 8) / 1_000_000).toFixed(1);
+      const dl = ((status.downlinkThroughputBps * 8) / 1_000_000).toFixed(1);
+      const ul = ((status.uplinkThroughputBps * 8) / 1_000_000).toFixed(1);
       console.log(
-        `[DISH] ping=${status.popPingLatency.toFixed(1)}ms ` +
+        `[DISH] ping=${status.popPingLatencyMs.toFixed(1)}ms ` +
         `dl=${dl}Mbps ul=${ul}Mbps ` +
-        `az=${status.boresightAzimuth.toFixed(1)}\u00B0 el=${status.boresightElevation.toFixed(1)}\u00B0 ` +
+        `az=${status.boresightAzimuthDeg.toFixed(1)}\u00B0 el=${status.boresightElevationDeg.toFixed(1)}\u00B0 ` +
         `drop=${(status.popPingDropRate * 100).toFixed(2)}% ` +
         `obstruct=${status.obstructionPercentTime.toFixed(2)}% ` +
         `state=${status.state}`
@@ -178,7 +178,7 @@ async function pollStatus(): Promise<void> {
         broadcast(
           createEventMessage({
             timestamp: Date.now(),
-            message: `Dish: ping ${status.popPingLatency.toFixed(0)}ms | \u2193${dl} \u2191${ul} Mbps | az ${status.boresightAzimuth.toFixed(1)}\u00B0 el ${status.boresightElevation.toFixed(1)}\u00B0`,
+            message: `Dish: ping ${status.popPingLatencyMs.toFixed(0)}ms | \u2193${dl} \u2191${ul} Mbps | az ${status.boresightAzimuthDeg.toFixed(1)}\u00B0 el ${status.boresightElevationDeg.toFixed(1)}\u00B0`,
             type: 'info',
           })
         );
@@ -189,14 +189,9 @@ async function pollStatus(): Promise<void> {
 }
 
 async function pollHistory(): Promise<void> {
-  if (useDemoMode) {
-    const history = generateMockHistory();
+  const history = await getHistory();
+  if (history) {
     broadcast(createHistoryMessage(history));
-  } else {
-    const history = await getHistory();
-    if (history) {
-      broadcast(createHistoryMessage(history));
-    }
   }
 }
 
@@ -225,14 +220,16 @@ async function main() {
           if (mode === 'demo') {
             useDemoMode = true;
             startTime = Date.now();
-            closeGrpcClient();
+            mockInstalled = false;
+            closeClient();
             console.log('\u{1F3AD} Switched to DEMO mode');
             broadcast(createEventMessage({
               timestamp: Date.now(), message: 'Switched to demo mode', type: 'info',
             }));
           } else if (mode === 'live') {
             console.log(`\u{1F4E1} Switching to LIVE mode, connecting to ${dishAddress}...`);
-            const connected = await initGrpcClient(dishAddress);
+            mockInstalled = false;
+            const connected = await initClient(dishAddress);
             if (connected) {
               useDemoMode = false;
               console.log(`\u{1F4E1} Connected to dish at ${dishAddress}`);
@@ -342,7 +339,7 @@ async function main() {
     if (historyInterval) clearInterval(historyInterval);
     if (popInterval) clearInterval(popInterval);
     if (tracerouteInterval) clearInterval(tracerouteInterval);
-    closeGrpcClient();
+    closeClient();
     server.close(() => process.exit(0));
   };
 

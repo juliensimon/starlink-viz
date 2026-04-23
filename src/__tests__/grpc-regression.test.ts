@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { generateMockStatus, generateMockHistory } from '../lib/grpc/mock-data';
 import type { DishStatus as NewDishStatus, DishHistory as NewDishHistory } from 'starlink-dish';
+import { useMock, getStatus as libGetStatus, closeClient } from 'starlink-dish';
 
 describe('generateMockStatus()', () => {
   it('returns a DishStatus with all required fields', () => {
@@ -76,5 +77,29 @@ describe('starlink-dish type contract', () => {
     expect(h.pingLatencyMs).toHaveLength(2);
     // @ts-expect-error — old pingLatency field must not exist
     expect(h.pingLatency).toBeUndefined();
+  });
+});
+
+describe('starlink-dish mock getStatus() matches expected server fields', () => {
+  afterEach(() => closeClient());
+
+  it('returns status with all fields server.ts reads', async () => {
+    useMock();
+    const s = await libGetStatus();
+    expect(s).not.toBeNull();
+    expect(typeof s!.deviceId).toBe('string');
+    expect(typeof s!.popPingLatencyMs).toBe('number');
+    expect(typeof s!.downlinkThroughputBps).toBe('number');
+    expect(typeof s!.uplinkThroughputBps).toBe('number');
+    expect(typeof s!.snrAboveNoiseFloor).toBe('boolean');
+    expect(typeof s!.uptimeSeconds).toBe('number');
+    expect(typeof s!.state).toBe('string');
+    expect(typeof s!.obstructionPercentTime).toBe('number');
+    expect(typeof s!.popPingDropRate).toBe('number');
+    expect(typeof s!.gpsSats).toBe('number');
+    expect(typeof s!.boresightAzimuthDeg).toBe('number');
+    expect(typeof s!.boresightElevationDeg).toBe('number');
+    expect(typeof s!.softwareVersion).toBe('string');
+    expect(s!.downlinkThroughputBps).toBeGreaterThan(1_000_000);
   });
 });
