@@ -24,6 +24,7 @@
     "react-dom": "19.2.3",
     "recharts": "^3.8.0",
     "satellite.js": "^6.0.2",
+    "starlink-dish": "^0.2.1",
     "three": "^0.183.2",
     "tsx": "^4.21.0",
     "ws": "^8.19.0",
