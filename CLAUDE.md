@@ -21,9 +21,9 @@ Real-time 3D Starlink satellite visualization built on Next.js 16, React Three F
 ### Server (`server.ts`)
 
 Custom HTTP server wrapping Next.js that handles:
-- **gRPC client** (`src/lib/grpc/`) — connects to a Starlink dish at `192.168.100.1:9200` (configurable via `DISH_ADDRESS`) to poll status and history
+- **Dish client** — connects to a Starlink dish at `192.168.100.1:9200` (configurable via `DISH_ADDRESS`) via the `starlink-dish` npm package to poll status and history
 - **WebSocket server** (`src/lib/websocket/server.ts`) — broadcasts dish telemetry, handoff events, and event log messages to all connected clients
-- **Demo mode** — auto-detected when no dish is reachable; uses mock data generators from `src/lib/grpc/mock-data.ts`. Controllable via `DEMO_MODE` env var (`true`/`false`/`auto`) and `/api/mode` endpoint
+- **Demo mode** — auto-detected when no dish is reachable; uses mock data via `starlink-dish` package's `useMock()`. Controllable via `DEMO_MODE` env var (`true`/`false`/`auto`) and `/api/mode` endpoint
 - **Polling loops** — status (1s), history (5s), PoP detection (10s), traceroute (60s)
 
 ### API Routes (`src/app/api/`)
@@ -132,7 +132,7 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 - Coordinate system: X = cos(lat)cos(lon), Y = sin(lat), Z = -cos(lat)sin(lon)
 - 5 orbital shells color-coded by inclination: 33° (gold), 43° (orange), 53° (blue), 70° (teal), 97.6° (pink-red). Classification in `getDimColor()` in `src/lib/utils/shell-colors.ts` must stay in sync with `shellIndex()` in `HandoffPanel.tsx` and `SHELL_ALT_BANDS` in `config.ts`
 - Camera mode toggled via `cameraMode` ('space' | 'sky') in app-store. Space/Sky toggle in ViewControls. `SatellitePropagator` and `ConnectionBeam` always mounted; visual components conditionally rendered
-- WebSocket protocol uses typed messages (`status`, `history`, `handoff`, `event`) defined in `src/lib/grpc/types.ts` with type guards in `src/lib/websocket/protocol.ts`
+- WebSocket protocol uses typed messages (`status`, `history`, `handoff`, `event`) defined in `src/lib/websocket/types.ts` with type guards in `src/lib/websocket/protocol.ts`
 - Dish location configured via `NEXT_PUBLIC_DISH_LAT` and `NEXT_PUBLIC_DISH_LON` env vars (defaults to 48.910, 1.910)
 - Scene is dynamically imported with SSR disabled (`next/dynamic`)
 - React strict mode is off (`reactStrictMode: false` in next.config.ts)

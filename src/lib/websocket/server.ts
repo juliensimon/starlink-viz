@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server as HTTPServer } from 'http';
-import type { WSMessage, DishStatus } from '../grpc/types';
+import type { WSMessage, DishStatus } from './types';
 import { createStatusMessage } from './protocol';
 
 let wss: WebSocketServer | null = null;
