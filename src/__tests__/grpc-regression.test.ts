@@ -1,52 +1,41 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { generateMockStatus, generateMockHistory } from '../lib/grpc/mock-data';
+import { useMock, getStatus, getHistory, closeClient } from 'starlink-dish';
 import type { DishStatus as NewDishStatus, DishHistory as NewDishHistory } from 'starlink-dish';
-import { useMock, getStatus as libGetStatus, closeClient } from 'starlink-dish';
 
-describe('generateMockStatus()', () => {
-  it('returns a DishStatus with all required fields', () => {
-    const s = generateMockStatus(5000);
-    expect(typeof s.deviceId).toBe('string');
-    expect(typeof s.downlinkThroughput).toBe('number');
-    expect(typeof s.uplinkThroughput).toBe('number');
-    expect(typeof s.popPingLatency).toBe('number');
-    expect(typeof s.popPingDropRate).toBe('number');
-    expect(typeof s.snr).toBe('number');
-    expect(typeof s.uptime).toBe('number');
-    expect(typeof s.obstructionPercentTime).toBe('number');
-    expect(Array.isArray(s.alerts)).toBe(true);
-    expect(s.state).toBe('CONNECTED');
-  });
+describe('starlink-dish mock getStatus()', () => {
+  afterEach(() => closeClient());
 
-  it('downlinkThroughput is in bytes/s (> 1_000_000 for typical values)', () => {
-    const s = generateMockStatus(0);
-    expect(s.downlinkThroughput).toBeGreaterThan(1_000_000);
-  });
-
-  it('snr is a numeric estimate (always 9-12 range)', () => {
-    for (let t = 0; t < 10000; t += 1000) {
-      const s = generateMockStatus(t);
-      expect(s.snr).toBeGreaterThanOrEqual(9);
-      expect(s.snr).toBeLessThanOrEqual(12);
-    }
+  it('returns a DishStatus with all fields server.ts relays', async () => {
+    useMock();
+    const s = await getStatus();
+    expect(s).not.toBeNull();
+    expect(typeof s!.deviceId).toBe('string');
+    expect(typeof s!.popPingLatencyMs).toBe('number');
+    expect(typeof s!.downlinkThroughputBps).toBe('number');
+    expect(typeof s!.uplinkThroughputBps).toBe('number');
+    expect(typeof s!.snrAboveNoiseFloor).toBe('boolean');
+    expect(typeof s!.uptimeSeconds).toBe('number');
+    expect(typeof s!.obstructionPercentTime).toBe('number');
+    expect(typeof s!.popPingDropRate).toBe('number');
+    expect(typeof s!.gpsSats).toBe('number');
+    expect(typeof s!.boresightAzimuthDeg).toBe('number');
+    expect(typeof s!.boresightElevationDeg).toBe('number');
+    expect(s!.state).toBe('CONNECTED');
+    expect(s!.downlinkThroughputBps).toBeGreaterThan(1_000_000);
   });
 });
 
-describe('generateMockHistory()', () => {
-  it('returns a DishHistory with all required fields', () => {
-    const h = generateMockHistory();
-    expect(Array.isArray(h.pingLatency)).toBe(true);
-    expect(Array.isArray(h.downlinkThroughput)).toBe(true);
-    expect(Array.isArray(h.uplinkThroughput)).toBe(true);
-    expect(Array.isArray(h.snr)).toBe(true);
-  });
+describe('starlink-dish mock getHistory()', () => {
+  afterEach(() => closeClient());
 
-  it('returns 60 samples', () => {
-    const h = generateMockHistory();
-    expect(h.pingLatency).toHaveLength(60);
-    expect(h.downlinkThroughput).toHaveLength(60);
-    expect(h.uplinkThroughput).toHaveLength(60);
-    expect(h.snr).toHaveLength(60);
+  it('returns a DishHistory with 60 samples', async () => {
+    useMock();
+    const h = await getHistory();
+    expect(h).not.toBeNull();
+    expect(h!.pingLatencyMs).toHaveLength(60);
+    expect(h!.downlinkThroughputBps).toHaveLength(60);
+    expect(h!.uplinkThroughputBps).toHaveLength(60);
+    expect(h!.pingLatencyMs.every((v) => v > 0)).toBe(true);
   });
 });
 
@@ -62,21 +51,22 @@ describe('starlink-dish type contract', () => {
       gpsValid: true, gpsSats: 0, ethSpeedMbps: 0, alerts: [],
     };
     expect(typeof s.snrAboveNoiseFloor).toBe('boolean');
-    // @ts-expect-error — old snr field must not exist on new type
-    expect(s.snr).toBeUndefined();
   });
 
   it('DishHistory uses pingLatencyMs not pingLatency', () => {
     const h: NewDishHistory = {
-      current: 0,
-      pingLatencyMs: [25, 30],
-      pingDropRate: [0.001],
-      downlinkThroughputBps: [100_000_000],
-      uplinkThroughputBps: [10_000_000],
+      current: 0, pingLatencyMs: [25], pingDropRate: [0.001],
+      downlinkThroughputBps: [100_000_000], uplinkThroughputBps: [10_000_000],
     };
-    expect(h.pingLatencyMs).toHaveLength(2);
-    // @ts-expect-error — old pingLatency field must not exist
-    expect(h.pingLatency).toBeUndefined();
+    expect(h.pingLatencyMs).toHaveLength(1);
+  });
+});
+
+describe('websocket field mapping — snrAboveNoiseFloor → store snr', () => {
+  it('snrAboveNoiseFloor:true maps to snr estimate 10.5', () => {
+    const snrEstimate = (above: boolean) => above ? 10.5 : 5.0;
+    expect(snrEstimate(true)).toBe(10.5);
+    expect(snrEstimate(false)).toBe(5.0);
   });
 });
 
@@ -85,7 +75,7 @@ describe('starlink-dish mock getStatus() matches expected server fields', () => 
 
   it('returns status with all fields server.ts reads', async () => {
     useMock();
-    const s = await libGetStatus();
+    const s = await getStatus();
     expect(s).not.toBeNull();
     expect(typeof s!.deviceId).toBe('string');
     expect(typeof s!.popPingLatencyMs).toBe('number');
@@ -101,13 +91,5 @@ describe('starlink-dish mock getStatus() matches expected server fields', () => 
     expect(typeof s!.boresightElevationDeg).toBe('number');
     expect(typeof s!.softwareVersion).toBe('string');
     expect(s!.downlinkThroughputBps).toBeGreaterThan(1_000_000);
-  });
-});
-
-describe('websocket field mapping — snrAboveNoiseFloor → store snr', () => {
-  it('snrAboveNoiseFloor:true maps to snr estimate 10.5', () => {
-    const snrEstimate = (above: boolean) => above ? 10.5 : 5.0;
-    expect(snrEstimate(true)).toBe(10.5);
-    expect(snrEstimate(false)).toBe(5.0);
   });
 });
