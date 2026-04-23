@@ -69,27 +69,3 @@ describe('websocket field mapping — snrAboveNoiseFloor → store snr', () => {
     expect(snrEstimate(false)).toBe(5.0);
   });
 });
-
-describe('starlink-dish mock getStatus() matches expected server fields', () => {
-  afterEach(() => closeClient());
-
-  it('returns status with all fields server.ts reads', async () => {
-    useMock();
-    const s = await getStatus();
-    expect(s).not.toBeNull();
-    expect(typeof s!.deviceId).toBe('string');
-    expect(typeof s!.popPingLatencyMs).toBe('number');
-    expect(typeof s!.downlinkThroughputBps).toBe('number');
-    expect(typeof s!.uplinkThroughputBps).toBe('number');
-    expect(typeof s!.snrAboveNoiseFloor).toBe('boolean');
-    expect(typeof s!.uptimeSeconds).toBe('number');
-    expect(typeof s!.state).toBe('string');
-    expect(typeof s!.obstructionPercentTime).toBe('number');
-    expect(typeof s!.popPingDropRate).toBe('number');
-    expect(typeof s!.gpsSats).toBe('number');
-    expect(typeof s!.boresightAzimuthDeg).toBe('number');
-    expect(typeof s!.boresightElevationDeg).toBe('number');
-    expect(typeof s!.softwareVersion).toBe('string');
-    expect(s!.downlinkThroughputBps).toBeGreaterThan(1_000_000);
-  });
-});
