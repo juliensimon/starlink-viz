@@ -13,3 +13,12 @@ export async function GET() {
     stations: GROUND_STATIONS,
   });
 }
+
+export async function POST() {
+  await refreshGroundStations();
+  initialized = true;
+  return Response.json({
+    count: GROUND_STATIONS.length,
+    stations: GROUND_STATIONS,
+  });
+}
