@@ -45,29 +45,29 @@ export function useWebSocket(): UseWebSocketReturn {
             // (dish only reports physical antenna tilt, not active beam direction)
             const currentStatus = useTelemetryStore.getState().dishStatus;
             updateStatus({
-              ping: status.popPingLatency,
-              downlink: status.downlinkThroughput,
-              uplink: status.uplinkThroughput,
-              snr: status.snr,
-              uptime: status.uptime,
+              ping: status.popPingLatencyMs,
+              downlink: status.downlinkThroughputBps,
+              uplink: status.uplinkThroughputBps,
+              snr: status.snrAboveNoiseFloor ? 10.5 : 5.0,
+              uptime: status.uptimeSeconds,
               state: status.state,
               obstructions: status.obstructionPercentTime,
               azimuth: currentStatus?.azimuth ?? 0,
               elevation: currentStatus?.elevation ?? 0,
               dropRate: status.popPingDropRate,
               gpsSats: status.gpsSats,
-              antennaBoresightAz: status.boresightAzimuth,
-              antennaBoresightEl: status.boresightElevation,
+              antennaBoresightAz: status.boresightAzimuthDeg,
+              antennaBoresightEl: status.boresightElevationDeg,
               deviceId: status.deviceId,
               softwareVersion: status.softwareVersion,
             });
 
             // Push to history ring buffer
             pushHistory({
-              ping: status.popPingLatency,
-              downlink: status.downlinkThroughput,
-              uplink: status.uplinkThroughput,
-              snr: status.snr,
+              ping: status.popPingLatencyMs,
+              downlink: status.downlinkThroughputBps,
+              uplink: status.uplinkThroughputBps,
+              snr: status.snrAboveNoiseFloor ? 10.5 : 5.0,
             });
             break;
           }

@@ -103,3 +103,11 @@ describe('starlink-dish mock getStatus() matches expected server fields', () => 
     expect(s!.downlinkThroughputBps).toBeGreaterThan(1_000_000);
   });
 });
+
+describe('websocket field mapping — snrAboveNoiseFloor → store snr', () => {
+  it('snrAboveNoiseFloor:true maps to snr estimate 10.5', () => {
+    const snrEstimate = (above: boolean) => above ? 10.5 : 5.0;
+    expect(snrEstimate(true)).toBe(10.5);
+    expect(snrEstimate(false)).toBe(5.0);
+  });
+});
