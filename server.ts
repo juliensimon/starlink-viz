@@ -31,7 +31,6 @@ const handle = app.getRequestHandler();
 
 let useDemoMode = false;
 let mockInstalled = false;
-let startTime = Date.now();
 let previousStatus: DishStatus | null = null;
 let statusInterval: ReturnType<typeof setInterval> | null = null;
 let historyInterval: ReturnType<typeof setInterval> | null = null;
@@ -219,7 +218,6 @@ async function main() {
           const { mode } = JSON.parse(body);
           if (mode === 'demo') {
             useDemoMode = true;
-            startTime = Date.now();
             mockInstalled = false;
             closeClient();
             console.log('\u{1F3AD} Switched to DEMO mode');
@@ -263,7 +261,6 @@ async function main() {
   // Detect dish availability
   const dishAvailable = await detectDishAvailability();
   useDemoMode = !dishAvailable;
-  startTime = Date.now();
 
   if (useDemoMode) {
     broadcast(
