@@ -231,7 +231,7 @@ This is the same technique network engineers use. It only works in live mode —
 
 **Data source:** Your dish's local API at `192.168.100.1:9200` (configurable via `DISH_ADDRESS` env var).
 
-**Implementation:** `src/lib/grpc/client.ts` — uses `@grpc/proto-loader` to dynamically load the protobuf definition. Polling intervals: status every 1s, history every 5s. Types defined in `src/lib/grpc/types.ts`.
+**Implementation:** `server.ts` uses the [`starlink-dish`](https://www.npmjs.com/package/starlink-dish) npm package to connect via gRPC. Polling intervals: status every 1s, history every 5s. WebSocket protocol types live in `src/lib/websocket/types.ts`.
 
 Every Starlink dish runs a gRPC server that the official Starlink app uses for diagnostics. This app taps into the same interface to read:
 
@@ -371,7 +371,7 @@ Selection runs every **500ms** (not every frame, for performance).
 
 ### 5. Demo Mode Telemetry — Fabricated
 
-**Implementation:** `src/lib/grpc/mock-data.ts` — generates smooth mock data using layered sine waves at different frequencies.
+**Implementation:** `server.ts` calls `useMock()` from the `starlink-dish` package when no dish is reachable. Demo data is generated with random variation over realistic ranges.
 
 **What the app does:** When no dish is connected (auto-detected, or forced via `DEMO_MODE=true`), throughput, SNR, and obstruction data are generated with layered sine waves and occasional random spikes — they *look* like real telemetry but aren't based on physics.
 

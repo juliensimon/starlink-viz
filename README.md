@@ -128,9 +128,8 @@ src/
 ├── stores/                  Zustand state (app + telemetry)
 ├── hooks/                   useSatellites, useHandoff
 └── lib/
-    ├── grpc/                Dish protocol, mock data
     ├── satellites/          TLE fetching, SGP4 propagation, satellite store
-    ├── websocket/           Client + server + protocol
+    ├── websocket/           Client + server + protocol + types
     └── utils/               Coordinates, astronomy, observer frame, sun shadow,
                              star coordinates, shell colors, formatting
 ```
@@ -154,7 +153,7 @@ src/
 - **[drei](https://drei.docs.pmnd.rs/)** — R3F helpers (OrbitControls, Billboard, Text, Stars)
 - **[satellite.js](https://github.com/shashwatak/satellite-js)** — SGP4/SDP4 orbital propagation + GMST
 - **[Zustand](https://zustand.docs.pmnd.rs/)** — Lightweight state management
-- **[gRPC](https://grpc.io/)** — Dish communication protocol
+- **[starlink-dish](https://www.npmjs.com/package/starlink-dish)** — TypeScript client for the Starlink dish local gRPC API
 - **[Tailwind CSS 4](https://tailwindcss.com/)** — Styling
 
 ## How it works
