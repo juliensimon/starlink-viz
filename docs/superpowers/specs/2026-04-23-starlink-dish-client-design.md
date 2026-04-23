@@ -159,9 +159,10 @@ Once published to npm:
 1. `npm install starlink-dish`
 2. Write regression tests against current `src/lib/grpc/client.ts` behavior (mock-based) — these become the safety net
 3. Swap imports one file at a time, running `npm test` after each:
-   - `server.ts`: `initGrpcClient` → `initClient`, `getStatus`, `getHistory` unchanged
+   - `server.ts`: `initGrpcClient` → `initClient` (function names change, signatures identical)
    - `src/lib/grpc/mock-data.ts` → replaced by `useMock()` from package
-   - HUD components: `snr` number field → `snrAboveNoiseFloor` boolean (failing test written first)
+   - `telemetry-store.ts` + `TelemetryPanel`: `DishHistory` field renames — `pingLatency` → `pingLatencyMs`, `downlinkThroughput` → `downlinkThroughputBps`, `uplinkThroughput` → `uplinkThroughputBps`; `snr` field dropped entirely (failing test first)
+   - HUD components: `DishStatus.snr` number → `snrAboveNoiseFloor` boolean (failing test written first)
 4. Delete `src/lib/grpc/` entirely once all tests pass
 
 ## TDD Strategy
