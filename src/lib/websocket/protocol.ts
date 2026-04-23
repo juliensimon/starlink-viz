@@ -4,7 +4,7 @@ import type {
   DishHistory,
   HandoffEvent,
   EventLogEntry,
-} from '../grpc/types';
+} from './types';
 
 // --- Type guards ---
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 import { useAppStore } from '@/stores/app-store';
-import type { WSMessage, DishStatus, DishHistory, HandoffEvent, EventLogEntry } from '../grpc/types';
+import type { WSMessage, DishStatus, DishHistory, HandoffEvent, EventLogEntry } from './types';
 
 const setWsConnected = (connected: boolean) => useAppStore.getState().setWsConnected(connected);
 

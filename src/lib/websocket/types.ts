@@ -1,11 +1,10 @@
-export type {
-  DishStatus,
-  DishHistory,
-} from 'starlink-dish';
+import type { DishStatus, DishHistory } from 'starlink-dish';
+
+export type { DishStatus, DishHistory };
 
 export interface WSMessage {
   type: 'status' | 'history' | 'handoff' | 'event';
-  data: import('starlink-dish').DishStatus | import('starlink-dish').DishHistory | HandoffEvent | EventLogEntry;
+  data: DishStatus | DishHistory | HandoffEvent | EventLogEntry;
   timestamp: number;
 }
 
