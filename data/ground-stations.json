@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-03-20T10:39:26.620Z",
+  "lastUpdated": "2026-06-10T21:06:45.661Z",
   "stations": [
     {
       "name": "Accra, Ghana",
@@ -68,6 +68,13 @@
       "name": "Anchorage, AK",
       "lat": 61.2181,
       "lon": -149.9003,
+      "status": "operational",
+      "type": "gateway"
+    },
+    {
+      "name": "Anchorage, AR",
+      "lat": -33.9190141,
+      "lon": 18.6521709,
       "status": "operational",
       "type": "gateway"
     },
@@ -1458,9 +1465,23 @@
       "type": "gateway"
     },
     {
+      "name": "Monterey, Mexico",
+      "lat": 25.77016,
+      "lon": -100.30188,
+      "status": "operational",
+      "type": "gateway"
+    },
+    {
       "name": "Monterrey, Mexico",
       "lat": 25.6866,
       "lon": -100.3161,
+      "status": "operational",
+      "type": "gateway"
+    },
+    {
+      "name": "Montes Carlos, Brazil",
+      "lat": -16.68367,
+      "lon": -43.83329,
       "status": "operational",
       "type": "gateway"
     },
@@ -1874,7 +1895,7 @@
       "name": "Robbins, CA",
       "lat": 38.875,
       "lon": -121.70705555555556,
-      "status": "planned",
+      "status": "operational",
       "type": "gateway"
     },
     {
@@ -2455,6 +2476,13 @@
       "name": "Willows, Australia",
       "lat": -19.3667,
       "lon": 146.7833,
+      "status": "operational",
+      "type": "gateway"
+    },
+    {
+      "name": "Willows. QLD, Australia",
+      "lat": -23.66665,
+      "lon": 147.5025,
       "status": "operational",
       "type": "gateway"
     },
