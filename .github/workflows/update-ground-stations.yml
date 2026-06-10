@@ -13,9 +13,9 @@ jobs:
   update-ground-stations:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -46,7 +46,7 @@ jobs:
             echo 'body=Automated ground station data update.' >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: peter-evans/create-pull-request@v7
+      - uses: peter-evans/create-pull-request@v8
         with:
           branch: auto/update-ground-stations
           title: 'chore: update ground station data'
