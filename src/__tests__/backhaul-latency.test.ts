@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { GS_BACKHAUL_RTT_MS, recomputeBackhaulRTT } from '../lib/utils/backhaul-latency';
+import { getBackhaulRTT } from '../lib/utils/backhaul-latency';
 import { GROUND_STATIONS, refreshGroundStations } from '../lib/satellites/ground-stations';
+
+let GS_BACKHAUL_RTT_MS: number[] = [];
 
 beforeAll(async () => {
   await refreshGroundStations();
-  recomputeBackhaulRTT();
+  GS_BACKHAUL_RTT_MS = getBackhaulRTT();
 }, 15_000);
 
-describe('GS_BACKHAUL_RTT_MS', () => {
+describe('getBackhaulRTT', () => {
   it('has an entry for every ground station', () => {
     expect(GS_BACKHAUL_RTT_MS.length).toBe(GROUND_STATIONS.length);
   });

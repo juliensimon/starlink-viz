@@ -79,7 +79,11 @@ export default function SatelliteInfoPanel() {
         .then((d) => {
           if (d.pop) {
             setPop(d.pop);
-            if (d.pop !== 'Unknown') setDetectedPop(d.pop);
+            // An active demo location owns the PoP constraint — don't let a
+            // late rDNS response overwrite it.
+            if (d.pop !== 'Unknown' && !useAppStore.getState().demoLocation) {
+              setDetectedPop(d.pop);
+            }
           }
           if (d.pop === 'Unknown' && retries < 3) {
             retries++;

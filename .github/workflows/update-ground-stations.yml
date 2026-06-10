@@ -28,9 +28,6 @@ jobs:
       - name: Run update script
         run: npx tsx scripts/update-ground-stations.ts
 
-      - name: Sync fallback data
-        run: npx tsx scripts/sync-fallback.ts
-
       - name: Run tests
         run: npm test
         env:

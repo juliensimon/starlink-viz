@@ -5,15 +5,15 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '@/stores/app-store';
 import { useTelemetryStore } from '@/stores/telemetry-store';
-import { getPositionsArray, getSatelliteCount, getSatelliteName, setConnectedGroundStation, setCurrentRoute, getCurrentRoute, setDetectedPop } from '@/lib/satellites/satellite-store';
+import { getPositionsArray, getSatelliteCount, getSatelliteName, setConnectedGroundStation, setCurrentRoute, getCurrentRoute } from '@/lib/satellites/satellite-store';
 import { geodeticToCartesian } from '@/lib/utils/coordinates';
 import { GROUND_STATIONS, groundStationsVersion } from '@/lib/satellites/ground-stations';
-import { DISH_POS, computeAzEl, azElToDirection } from '@/lib/utils/dish-frame';
+import { DISH_POS, DISH_NORMAL, computeAzEl, azElToDirection } from '@/lib/utils/dish-frame';
 import { computeGeometricLatency } from '@/lib/utils/geometric-latency';
 import { MAX_STEERING_DEG, MIN_ELEVATION_DEG, EARTH_RADIUS_KM, MIN_OPERATIONAL_ALT_KM, MAX_OPERATIONAL_ALT_KM, ISL_GRAPH_REBUILD_MS, ISL_PATHFIND_INTERVAL_MS, ISL_MAX_HOPS } from '@/lib/config';
 import { buildISLGraph } from '@/lib/satellites/isl-graph';
 import { findBestRoute } from '@/lib/utils/isl-pathfinder';
-import { GS_BACKHAUL_RTT_MS } from '@/lib/utils/backhaul-latency';
+import { getBackhaulRTT } from '@/lib/utils/backhaul-latency';
 
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -160,10 +160,18 @@ function totalPathLength(x: number, y: number, z: number): number {
 }
 
 const cosMaxSteer = Math.cos(degToRad(MAX_STEERING_DEG));
+const sinMinElevation = Math.sin(degToRad(MIN_ELEVATION_DEG));
 
 /**
  * Find the best satellite within the antenna's steering cone.
  * Only considers satellites within MAX_STEERING_DEG of the physical boresight.
+ *
+ * The cone and elevation tests work directly on the normalized dish→satellite
+ * vector: elevation > MIN ⟺ dot(dir, normal) > sin(MIN), and the cone test is
+ * dot(dir, boresightDir) ≥ cos(MAX_STEERING). The az/el round-trip the scan
+ * used to do per satellite (computeAzEl → azElToDirection) reconstructed this
+ * exact vector — ~7,500 sats × 2 allocations + 6 trig calls every 500ms.
+ * Az/el is only computed for the satellite actually returned.
  */
 function findBestSatellite(currentIdx: number | null): {
   index: number | null;
@@ -182,10 +190,7 @@ function findBestSatellite(currentIdx: number | null): {
   let bestIdx = -1;
   let bestDot = -1;
   let bestPath = Infinity;
-  let bestAz = 0;
 
-  let currentAz = 0;
-  let currentEl = -90;
   let currentInCone = false;
 
   for (let i = 0; i < count; i++) {
@@ -200,17 +205,22 @@ function findBestSatellite(currentIdx: number | null): {
     const altKm = (posLen - 1) * EARTH_RADIUS_KM;
     if (altKm < MIN_OPERATIONAL_ALT_KM || altKm > MAX_OPERATIONAL_ALT_KM) continue;
 
-    const { az, el } = computeAzEl(x, y, z);
-    if (el <= MIN_ELEVATION_DEG) continue;
+    // Normalized dish→satellite direction
+    const dx = x - DISH_POS.x;
+    const dy = y - DISH_POS.y;
+    const dz = z - DISH_POS.z;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len < 1e-10) continue;
+    const dirX = dx / len, dirY = dy / len, dirZ = dz / len;
+
+    const sinEl = dirX * DISH_NORMAL.x + dirY * DISH_NORMAL.y + dirZ * DISH_NORMAL.z;
+    if (sinEl <= sinMinElevation) continue;
 
     // Check if satellite is within the antenna's steering cone
-    const satDir = azElToDirection(az, el);
-    const dot = boresightDir.x * satDir.x + boresightDir.y * satDir.y + boresightDir.z * satDir.z;
+    const dot = boresightDir.x * dirX + boresightDir.y * dirY + boresightDir.z * dirZ;
     if (dot < cosMaxSteer) continue;
 
     if (i === currentIdx) {
-      currentAz = az;
-      currentEl = el;
       currentInCone = true;
     }
 
@@ -219,7 +229,6 @@ function findBestSatellite(currentIdx: number | null): {
       bestDot = dot;
       bestPath = totalPathLength(x, y, z);
       bestIdx = i;
-      bestAz = az;
     } else if (dot > bestDot - 0.001) {
       // Similar alignment — prefer shorter total path (lower latency)
       const path = totalPathLength(x, y, z);
@@ -227,19 +236,20 @@ function findBestSatellite(currentIdx: number | null): {
         bestDot = dot;
         bestPath = path;
         bestIdx = i;
-        bestAz = az;
       }
     }
   }
 
-  if (currentIdx !== null && currentInCone && currentEl > MIN_ELEVATION_DEG) {
-    return { index: currentIdx, az: currentAz, el: currentEl };
+  if (currentIdx !== null && currentInCone) {
+    const pi = currentIdx * 3;
+    const { az, el } = computeAzEl(positions[pi], positions[pi + 1], positions[pi + 2]);
+    return { index: currentIdx, az, el };
   }
 
   if (bestIdx >= 0) {
     const pi = bestIdx * 3;
-    const { el: bestEl } = computeAzEl(positions[pi], positions[pi + 1], positions[pi + 2]);
-    return { index: bestIdx, az: bestAz, el: bestEl };
+    const { az, el } = computeAzEl(positions[pi], positions[pi + 1], positions[pi + 2]);
+    return { index: bestIdx, az, el };
   }
   return { index: null, az: 0, el: 0 };
 }
@@ -470,8 +480,7 @@ export default function ConnectionBeam() {
       const dp = geodeticToCartesian(degToRad(demoLoc.lat), degToRad(demoLoc.lon), 0, 1);
       _demoDishVec.set(dp.x, dp.y, dp.z);
       dishVec = _demoDishVec;
-      // Set the PoP for pathfinder constraint
-      setDetectedPop(demoLoc.pop);
+      // PoP constraint is owned by the app-store demo actions, not set here.
     }
 
     // Rebuild ISL graph periodically
@@ -543,6 +552,9 @@ export default function ConnectionBeam() {
     const pi = currentIdx * 3;
     _satPos.set(positions[pi], positions[pi + 1], positions[pi + 2]);
     if (_satPos.x === 0 && _satPos.y === 0 && _satPos.z === 0) return;
+    // Out-of-range index (e.g. mid-rebuild) reads undefined → NaN vectors
+    // that corrupt THREE geometry; never feed them to the beams.
+    if (!Number.isFinite(_satPos.x) || !Number.isFinite(_satPos.y) || !Number.isFinite(_satPos.z)) return;
 
     // Handoff animation
     if (isHandingOffRef.current) {
@@ -685,7 +697,7 @@ export default function ConnectionBeam() {
       } else {
         geoLatency = computeGeometricLatency(dishVec, _satPos, gsVec);
         // Add backhaul for direct path
-        if (lastGSIndex >= 0) geoLatency += GS_BACKHAUL_RTT_MS[lastGSIndex];
+        if (lastGSIndex >= 0) geoLatency += getBackhaulRTT()[lastGSIndex];
       }
 
       lastComputedLatencyMs = geoLatency;

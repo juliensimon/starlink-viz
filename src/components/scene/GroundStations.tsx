@@ -53,11 +53,22 @@ export default function GroundStations() {
   const [gsVersion, setGsVersion] = useState(groundStationsVersion);
   const geometry = useMemo(() => createStarGeometry(0.007, 0.003, 4), []);
 
-  // Load ground stations from API on mount (client-side)
+  // Load ground stations from API on mount (client-side), retrying with
+  // backoff — a transient fetch failure must not leave the session empty.
   useEffect(() => {
-    if (GROUND_STATIONS.length === 0) {
-      refreshGroundStations().then(() => setGsVersion(groundStationsVersion));
-    }
+    if (GROUND_STATIONS.length > 0) return;
+    let cancelled = false;
+    let delayMs = 2000;
+    const load = async () => {
+      while (!cancelled && GROUND_STATIONS.length === 0) {
+        if (await refreshGroundStations()) break;
+        await new Promise((r) => setTimeout(r, delayMs));
+        delayMs = Math.min(delayMs * 2, 60_000);
+      }
+      if (!cancelled) setGsVersion(groundStationsVersion);
+    };
+    load();
+    return () => { cancelled = true; };
   }, []);
   const operationalMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff9933'), side: THREE.DoubleSide }),

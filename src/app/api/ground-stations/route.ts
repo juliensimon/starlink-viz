@@ -5,8 +5,11 @@ let lastRefreshedAt = 0;
 
 async function refreshIfNeeded() {
   if (Date.now() - lastRefreshedAt > MAX_AGE_MS) {
-    await refreshGroundStations();
-    lastRefreshedAt = Date.now();
+    // Only record success — a failed refresh must be retried on the
+    // next request, not cached for 24h.
+    if (await refreshGroundStations()) {
+      lastRefreshedAt = Date.now();
+    }
   }
 }
 
@@ -19,8 +22,9 @@ export async function GET() {
 }
 
 export async function POST() {
-  await refreshGroundStations();
-  lastRefreshedAt = Date.now();
+  if (await refreshGroundStations()) {
+    lastRefreshedAt = Date.now();
+  }
   return Response.json({
     count: GROUND_STATIONS.length,
     stations: GROUND_STATIONS,

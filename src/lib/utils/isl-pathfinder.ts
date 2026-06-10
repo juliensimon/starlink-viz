@@ -12,10 +12,10 @@
 
 import { getPositionsArray, getISLCapableArray, getDetectedPop, type RoutePath } from '../satellites/satellite-store';
 import { getISLGraph } from '../satellites/isl-graph';
-import { geodeticToCartesian } from './coordinates';
+import { geodeticToCartesian, haversineKm } from './coordinates';
 import { computeGeometricLatency, computeISLRouteLatency, SPEED_OF_LIGHT_KM_S } from './geometric-latency';
 import { GROUND_STATIONS, groundStationsVersion } from '../satellites/ground-stations';
-import { GS_BACKHAUL_RTT_MS } from './backhaul-latency';
+import { getBackhaulRTT } from './backhaul-latency';
 import { ISL_MAX_HOPS, ISL_PROCESSING_DELAY_MS, EARTH_RADIUS_KM } from '../config';
 
 function degToRad(deg: number): number {
@@ -39,6 +39,10 @@ function ensureGSData(): void {
   // Invalidate PoP GS cache since station indices changed
   cachedPopGSIndices = null;
   cachedPopName = null;
+  // A held route's groundStationIndex points into the old array ordering —
+  // holding it across a refresh would route to (and display) the wrong station.
+  previousRoute = null;
+  previousRouteTime = 0;
   lastGSVersion = groundStationsVersion;
 }
 
@@ -68,17 +72,6 @@ const POP_LOCATIONS: Record<string, { lat: number; lon: number }> = {
  *  under ~1,500km. Ireland→Frankfurt (1,200km) is borderline;
  *  Spain→Frankfurt (1,800km) is too far. */
 const POP_GS_MAX_DISTANCE_KM = 1500;
-
-/** Haversine great-circle distance in km */
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLat = degToRad(lat2 - lat1);
-  const dLon = degToRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(degToRad(lat1)) * Math.cos(degToRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 /**
  * Get the set of operational GS indices that can serve the detected PoP.
@@ -185,7 +178,12 @@ function hasLineOfSight(
 
   // Project origin onto the line sat→GS: t = -dot(sat, dir) / |dir|²
   const t = -(satPos.x * dx + satPos.y * dy + satPos.z * dz) / lenSq;
-  const tClamped = Math.max(0, Math.min(1, t));
+  // Closest approach at or beyond an endpoint → the segment never dips
+  // below the surface (both endpoints are at radius >= 1). Deciding via
+  // the clamped distance would compare the GS's own radius (≈1.0) against
+  // 1.0 and let float noise pick the answer.
+  if (t <= 0 || t >= 1) return true;
+  const tClamped = t;
 
   // Closest point on segment to origin
   const cx = satPos.x + tClamped * dx;
@@ -312,6 +310,14 @@ let previousRouteTime = 0;
  *  Real Starlink holds routes for 30–60s. */
 const ROUTE_HOLD_MS = 30000;
 
+/** Discard the held route. Call when the satellite catalog is rebuilt
+ *  (TLE refresh, altitude-filter toggle) — the held route's satellite
+ *  indices then refer to different satellites. */
+export function resetRouteState(): void {
+  previousRoute = null;
+  previousRouteTime = 0;
+}
+
 function routeSummary(r: RoutePath): RouteDecisionEntry['route'] {
   return {
     type: r.type,
@@ -365,12 +371,12 @@ export function findBestRoute(
   const directRoutes: RoutePath[] = [];
 
   if (!islMandatory) {
-    // Use visible GSes for direct routes — no point evaluating GSes the sat can't see
-    const directCandidates = visiblePopGS.length > 0 ? visiblePopGS : gsIndices;
-    const nearestGSes = findNearestGSIndices(satPos, 5, directCandidates);
+    // Only GSes with line-of-sight are valid direct endpoints — falling back
+    // to the full set here used to produce routes through the Earth.
+    const nearestGSes = findNearestGSIndices(satPos, 5, visiblePopGS);
 
     for (const gsIdx of nearestGSes) {
-      const latency = computeGeometricLatency(dishPos, satPos, gsPositions[gsIdx]) + GS_BACKHAUL_RTT_MS[gsIdx];
+      const latency = computeGeometricLatency(dishPos, satPos, gsPositions[gsIdx]) + getBackhaulRTT()[gsIdx];
       directRoutes.push({
         type: 'direct',
         satelliteIndices: [connectedSatIndex],
@@ -430,7 +436,7 @@ export function findBestRoute(
             const satPositions = pathIndices.map((si) => posAt(positions, si)!).filter(Boolean);
             const gsNear = findNearestGSIndices(nodePos, 3, visibleFromHere);
             for (const gsIdx of gsNear) {
-              const routeLatency = computeISLRouteLatency(dishPos, satPositions, gsPositions[gsIdx]) + GS_BACKHAUL_RTT_MS[gsIdx];
+              const routeLatency = computeISLRouteLatency(dishPos, satPositions, gsPositions[gsIdx]) + getBackhaulRTT()[gsIdx];
               islRoutes.push({
                 type: 'isl',
                 satelliteIndices: pathIndices,
@@ -449,16 +455,17 @@ export function findBestRoute(
 
       const start = graph.neighborOffsets[qNode.satIndex];
       const end = graph.neighborOffsets[qNode.satIndex + 1];
+      const expandNodePos = posAt(positions, qNode.satIndex);
+      if (!expandNodePos) continue;
 
       for (let e = start; e < end; e++) {
         const neighbor = graph.neighborIndices[e];
         if (visited.has(neighbor)) continue;
 
         const neighborPos = posAt(positions, neighbor);
-        const nodePos = posAt(positions, qNode.satIndex);
-        if (!neighborPos || !nodePos) continue;
+        if (!neighborPos) continue;
 
-        const hopLatency = segmentLatencyMs(nodePos, neighborPos) + ISL_PROCESSING_DELAY_MS;
+        const hopLatency = segmentLatencyMs(expandNodePos, neighborPos) + ISL_PROCESSING_DELAY_MS;
         queue.push({
           satIndex: neighbor,
           latencyMs: qNode.latencyMs + hopLatency,
@@ -497,20 +504,26 @@ export function findBestRoute(
     // The real system doesn't drop to unconstrained routing when the
     // topology momentarily lacks a path.
     if (islMandatory && previousRoute && previousRoute.type === 'isl') {
-      // Recompute latency with current positions
       const exitSatPos = posAt(positions, previousRoute.satelliteIndices[previousRoute.satelliteIndices.length - 1]);
       const exitGSPos = gsPositions[previousRoute.groundStationIndex];
-      if (exitSatPos && exitGSPos) {
+      // Only hold while the route is still geometrically possible — the exit
+      // satellite must keep line-of-sight to its gateway, same as the normal
+      // hold path below. Without this check an impossible route persisted
+      // indefinitely.
+      if (exitSatPos && exitGSPos && hasLineOfSight(exitSatPos, exitGSPos)) {
         const satPositions = previousRoute.satelliteIndices.map((si) => posAt(positions, si)!).filter(Boolean);
         if (satPositions.length > 0) {
           previousRoute = {
             ...previousRoute,
-            latencyMs: computeISLRouteLatency(dishPos, satPositions, exitGSPos) + GS_BACKHAUL_RTT_MS[previousRoute.groundStationIndex],
+            latencyMs: computeISLRouteLatency(dishPos, satPositions, exitGSPos) + getBackhaulRTT()[previousRoute.groundStationIndex],
           };
         }
+        logRouteDecision({ time: new Date().toISOString(), action: 'hold', reason: 'ISL mandatory, no new candidates — holding previous ISL route', route: routeSummary(previousRoute), context: logCtx });
+        return previousRoute;
       }
-      logRouteDecision({ time: new Date().toISOString(), action: 'hold', reason: 'ISL mandatory, no new candidates — holding previous ISL route', route: routeSummary(previousRoute), context: logCtx });
-      return previousRoute;
+      logRouteDecision({ time: new Date().toISOString(), action: 'hold-invalid', reason: 'held ISL route lost LoS, no new candidates', route: routeSummary(previousRoute), context: logCtx });
+      previousRoute = null;
+      previousRouteTime = 0;
     }
 
     // Genuine fallback — no previous ISL route to hold
@@ -520,9 +533,12 @@ export function findBestRoute(
       logRouteDecision({ time: new Date().toISOString(), action: 'fallback', reason: 'no candidates, using direct', route: routeSummary(previousRoute), context: logCtx });
       return previousRoute;
     }
-    const fallbackGS = findNearestGSIndices(satPos, 1, operationalGSIndices);
+    // Unconstrained fallback still requires line-of-sight — a GS the
+    // satellite cannot see is not a route, however close it is.
+    const visibleAnyGS = findVisibleGSIndices(satPos, operationalGSIndices);
+    const fallbackGS = findNearestGSIndices(satPos, 1, visibleAnyGS);
     if (fallbackGS.length > 0) {
-      const latency = computeGeometricLatency(dishPos, satPos, gsPositions[fallbackGS[0]]) + GS_BACKHAUL_RTT_MS[fallbackGS[0]];
+      const latency = computeGeometricLatency(dishPos, satPos, gsPositions[fallbackGS[0]]) + getBackhaulRTT()[fallbackGS[0]];
       previousRoute = { type: 'direct', satelliteIndices: [connectedSatIndex], groundStationIndex: fallbackGS[0], latencyMs: latency, hopCount: 0 };
       previousRouteTime = now;
       logRouteDecision({ time: new Date().toISOString(), action: 'fallback', reason: 'no candidates, unconstrained nearest GS', route: routeSummary(previousRoute), context: logCtx });
@@ -548,13 +564,13 @@ export function findBestRoute(
         if (satPositions.length > 0) {
           previousRoute = {
             ...previousRoute,
-            latencyMs: computeISLRouteLatency(dishPos, satPositions, exitGSPos) + GS_BACKHAUL_RTT_MS[previousRoute.groundStationIndex],
+            latencyMs: computeISLRouteLatency(dishPos, satPositions, exitGSPos) + getBackhaulRTT()[previousRoute.groundStationIndex],
           };
         }
       } else {
         previousRoute = {
           ...previousRoute,
-          latencyMs: computeGeometricLatency(dishPos, satPos, exitGSPos) + GS_BACKHAUL_RTT_MS[previousRoute.groundStationIndex],
+          latencyMs: computeGeometricLatency(dishPos, satPos, exitGSPos) + getBackhaulRTT()[previousRoute.groundStationIndex],
         };
       }
       logRouteDecision({ time: new Date().toISOString(), action: 'hold', reason: `valid, ${Math.round(logCtx.holdTimeRemaining / 1000)}s remaining`, route: routeSummary(previousRoute), context: logCtx });

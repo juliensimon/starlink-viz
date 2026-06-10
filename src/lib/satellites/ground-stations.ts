@@ -25,12 +25,21 @@ export const GROUND_STATIONS: GroundStation[] = [];
  *  that cache derived data (e.g. gsPositions) should watch this. */
 export let groundStationsVersion = 0;
 
+/** Replace GROUND_STATIONS contents in place and bump the version counter. */
+export function applyStations(stations: GroundStation[]): void {
+  GROUND_STATIONS.length = 0;
+  GROUND_STATIONS.push(...stations);
+  groundStationsVersion++;
+}
+
 /**
  * Fetch ground station data and populate GROUND_STATIONS in-place.
  * - Server: fetches directly from HF dataset API
  * - Client: fetches from /api/ground-stations (which returns server's data)
+ *
+ * @returns true if a non-empty station list was loaded
  */
-export async function refreshGroundStations(): Promise<void> {
+export async function refreshGroundStations(): Promise<boolean> {
   try {
     let stations: GroundStation[];
 
@@ -56,21 +65,15 @@ export async function refreshGroundStations(): Promise<void> {
 
     if (!stations || stations.length === 0) {
       console.warn('[GS] Received 0 stations');
-      return;
+      return false;
     }
 
-    GROUND_STATIONS.length = 0;
-    GROUND_STATIONS.push(...stations);
-    groundStationsVersion++;
+    applyStations(stations);
     console.log(`[GS] Ground stations loaded: ${stations.length} (v${groundStationsVersion})`);
-
-    // Recompute backhaul RTT with new station list (server-side only)
-    if (typeof window === 'undefined') {
-      const { recomputeBackhaulRTT } = await import('../utils/backhaul-latency');
-      recomputeBackhaulRTT();
-    }
+    return true;
   } catch (err) {
     console.warn('[GS] Failed to load ground stations:', err);
+    return false;
   }
 }
 

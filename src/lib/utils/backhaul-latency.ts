@@ -9,8 +9,8 @@
  * Returns RTT contribution (doubled one-way + processing).
  */
 
-import { GROUND_STATIONS } from '../satellites/ground-stations';
-import { EARTH_RADIUS_KM } from '../config';
+import { GROUND_STATIONS, groundStationsVersion } from '../satellites/ground-stations';
+import { haversineKm } from './coordinates';
 
 interface IXP {
   name: string;
@@ -54,21 +54,6 @@ const FIBER_SPEED_KM_S = 299792.458 * 0.67; // ~200,861 km/s
 const FIBER_ROUTE_FACTOR = 1.4; // fiber paths aren't great-circle straight
 const ROUTER_PROCESSING_MS = 1.0; // per-direction router/switch delay
 
-function degToRad(deg: number): number {
-  return (deg * Math.PI) / 180;
-}
-
-/** Haversine great-circle distance in km */
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLat = degToRad(lat2 - lat1);
-  const dLon = degToRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(degToRad(lat1)) * Math.cos(degToRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 function computeRTTArray(): number[] {
   return GROUND_STATIONS.map((gs) => {
     let minDist = Infinity;
@@ -82,14 +67,18 @@ function computeRTTArray(): number[] {
   });
 }
 
-/**
- * Pre-computed RTT backhaul latency (ms) for each ground station.
- * Index matches GROUND_STATIONS array. Updated by recomputeBackhaulRTT().
- */
-export let GS_BACKHAUL_RTT_MS: number[] = computeRTTArray();
+let cachedRTT: number[] = [];
+let cachedVersion = -1;
 
-/** Rebuild GS_BACKHAUL_RTT_MS from the current GROUND_STATIONS array.
- *  Called by refreshGroundStations() after updating the station list. */
-export function recomputeBackhaulRTT(): void {
-  GS_BACKHAUL_RTT_MS = computeRTTArray();
+/**
+ * RTT backhaul latency (ms) for each ground station; index matches
+ * GROUND_STATIONS. Lazily recomputed whenever groundStationsVersion
+ * changes, so it stays in sync on both server and client.
+ */
+export function getBackhaulRTT(): number[] {
+  if (cachedVersion !== groundStationsVersion) {
+    cachedRTT = computeRTTArray();
+    cachedVersion = groundStationsVersion;
+  }
+  return cachedRTT;
 }

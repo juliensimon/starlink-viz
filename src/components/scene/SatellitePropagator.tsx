@@ -13,8 +13,11 @@ import {
   setFullCatalog,
   setRAANArray,
   setISLCapableArray,
+  setCurrentRoute,
 } from '@/lib/satellites/satellite-store';
 import { computeISLArrays } from '@/lib/satellites/isl-capability';
+import { parseLaunchYear } from '@/lib/satellites/tle-parse';
+import { resetRouteState } from '@/lib/utils/isl-pathfinder';
 import { useAppStore } from '@/stores/app-store';
 import { isOperationalAltitude } from '@/lib/config';
 import type { SatRec } from '@/lib/satellites/propagator';
@@ -51,14 +54,9 @@ export default function SatellitePropagator() {
       allInclinations[i] = isNaN(inc) ? 53 : inc;
       const data = propagateSingle(allSatrecs[i], now);
       allAltitudes[i] = data ? data.altitudeKm : 0;
-      const yy = parseInt(tleData[i].line1.substring(9, 11), 10);
-      allLaunchYears[i] = isNaN(yy) ? 0 : (yy >= 57 ? 1900 + yy : 2000 + yy);
+      allLaunchYears[i] = parseLaunchYear(tleData[i].line1);
     }
     setFullCatalog(totalCount, allInclinations, allAltitudes, allLaunchYears);
-
-    // Compute ISL capability and RAAN for the full catalog
-    const tleLines2 = tleData.map((t) => t.line2);
-    computeISLArrays(tleLines2, allInclinations, allLaunchYears, totalCount);
 
     let filteredTle = tleData;
     let filteredSatrecs = allSatrecs;
@@ -98,8 +96,7 @@ export default function SatellitePropagator() {
     const filteredLines2 = filteredTle.map((t) => t.line2);
     const filteredLaunchYears = new Uint16Array(count);
     for (let i = 0; i < count; i++) {
-      const yy = parseInt(filteredTle[i].line1.substring(9, 11), 10);
-      filteredLaunchYears[i] = isNaN(yy) ? 0 : (yy >= 57 ? 1900 + yy : 2000 + yy);
+      filteredLaunchYears[i] = parseLaunchYear(filteredTle[i].line1);
     }
     const { raanArray: filteredRaans, islCapableArray: filteredIsl } = computeISLArrays(
       filteredLines2, inclinations, filteredLaunchYears, count,
@@ -112,6 +109,12 @@ export default function SatellitePropagator() {
 
     console.log(`Loaded ${count} satellites`);
     useAppStore.getState().setSatellitesLoaded(true);
+    // Indices into the previous catalog now point at different satellites —
+    // drop the connected satellite and any held route so nothing reads the
+    // new positionsArray with a stale index (NaN geometry / wrong satellite).
+    useAppStore.getState().setConnectedSatellite(null);
+    setCurrentRoute(null);
+    resetRouteState();
     useAppStore.getState().bumpSatellitesVersion();
   }, [tleData, altitudeFilter]);
 

@@ -143,23 +143,10 @@ export function normalizeName(name: string): string {
   return n;
 }
 
-/**
- * Haversine distance in km between two lat/lon points.
- */
-export function haversineKm(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number,
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// Shared implementation — keeps the offline reconciliation script using the
+// exact same Earth radius and great-circle math as runtime routing.
+export { haversineKm } from '../src/lib/utils/coordinates';
+import { haversineKm } from '../src/lib/utils/coordinates';
 
 /**
  * Merge two status values. Operational wins over planned
@@ -712,6 +699,22 @@ async function reconcile(
   // Final dedup pass: merge any stations within 5km of each other
   // (catches duplicates introduced by different naming across sources)
   const stations = [...result.values()];
+  const deduped = dedupNearbyStations(stations);
+
+  if (deduped.length < stations.length) {
+    console.log(`  Deduped ${stations.length - deduped.length} stations within 5km of another`);
+  }
+
+  return deduped.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Merge stations within 5km of each other, keeping the more descriptive
+ * (longer) name. Never merges across types: a 'pop' co-located with a
+ * 'gateway' is real infrastructure, not a duplicate — and routing excludes
+ * pops, so a cross-type merge would silently drop a gateway.
+ */
+export function dedupNearbyStations(stations: Station[]): Station[] {
   const deduped: Station[] = [];
   const merged = new Set<number>();
 
@@ -721,9 +724,9 @@ async function reconcile(
 
     for (let j = i + 1; j < stations.length; j++) {
       if (merged.has(j)) continue;
-      if (haversineKm(keeper.lat, keeper.lon, stations[j].lat, stations[j].lon) < 5) {
-        // Keep the station with the more descriptive name (longer, or from existing data)
-        const other = stations[j];
+      const other = stations[j];
+      if ((keeper.type ?? 'gateway') !== (other.type ?? 'gateway')) continue;
+      if (haversineKm(keeper.lat, keeper.lon, other.lat, other.lon) < 5) {
         if (other.name.length > keeper.name.length) {
           keeper = { ...other, status: mergeStatus(keeper.status, other.status) };
         } else {
@@ -735,11 +738,7 @@ async function reconcile(
     deduped.push(keeper);
   }
 
-  if (merged.size > 0) {
-    console.log(`  Deduped ${merged.size} stations within 5km of another`);
-  }
-
-  return deduped.sort((a, b) => a.name.localeCompare(b.name));
+  return deduped;
 }
 
 // ── Meta tracking (lastSeen / miss count) ──────────────────────────────

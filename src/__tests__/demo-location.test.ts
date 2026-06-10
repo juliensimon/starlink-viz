@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore, DEMO_LOCATIONS } from '../stores/app-store';
+import { setDetectedPop, getDetectedPop } from '../lib/satellites/satellite-store';
 
 describe('demo location management', () => {
   beforeEach(() => {
@@ -92,5 +93,41 @@ describe('demo location management', () => {
     for (const loc of DEMO_LOCATIONS) {
       expect(knownPops).toContain(loc.pop);
     }
+  });
+});
+
+describe('detectedPop lifecycle (demo mode)', () => {
+  // Bug history: ConnectionBeam wrote demoLoc.pop into the satellite-store
+  // every frame, racing the real rDNS writer — and nothing cleared it on
+  // demo exit, so a demo PoP kept constraining gateway selection to the
+  // wrong continent for the rest of the session.
+  beforeEach(() => {
+    useAppStore.setState({ demoMode: false, demoLocation: null });
+    setDetectedPop(null);
+  });
+
+  it('entering demo mode assigns the demo location PoP', () => {
+    useAppStore.getState().setDemoMode(true);
+    expect(getDetectedPop()).toBe(DEMO_LOCATIONS[0].pop);
+  });
+
+  it('switching demo location switches the PoP', () => {
+    useAppStore.getState().setDemoMode(true);
+    const celtic = DEMO_LOCATIONS.find((l) => l.name === 'Celtic Sea')!;
+    useAppStore.getState().setDemoLocation(celtic);
+    expect(getDetectedPop()).toBe(celtic.pop);
+  });
+
+  it('leaving demo mode clears the demo PoP', () => {
+    useAppStore.getState().setDemoMode(true);
+    expect(getDetectedPop()).not.toBeNull();
+    useAppStore.getState().setDemoMode(false);
+    expect(getDetectedPop()).toBeNull();
+  });
+
+  it('clearing the demo location clears the PoP', () => {
+    useAppStore.getState().setDemoMode(true);
+    useAppStore.getState().setDemoLocation(null);
+    expect(getDetectedPop()).toBeNull();
   });
 });

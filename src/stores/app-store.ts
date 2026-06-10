@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { setDetectedPop } from '@/lib/satellites/satellite-store';
 
 export interface DemoLocation {
   name: string;
@@ -80,14 +81,17 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedSatellite: (index) => set({ selectedSatelliteIndex: index }),
   setConnectedSatellite: (index) => set({ connectedSatelliteIndex: index }),
   setViewState: (state) => set({ viewState: state }),
-  setDemoMode: (enabled) => set((s) => ({
-    demoMode: enabled,
+  setDemoMode: (enabled) => set((s) => {
     // Set Iceland Gap only when first entering demo, clear when leaving.
     // Don't reset if already in demo (preserves user's location choice).
-    demoLocation: enabled
+    const demoLocation = enabled
       ? (s.demoMode ? s.demoLocation : DEMO_LOCATIONS[0])
-      : null,
-  })),
+      : null;
+    // The demo location owns the PoP constraint while active; leaving demo
+    // must clear it or it keeps constraining routing to the wrong continent.
+    setDetectedPop(demoLocation?.pop ?? null);
+    return { demoMode: enabled, demoLocation };
+  }),
   setSatellitesLoaded: (loaded) => set({ satellitesLoaded: loaded }),
   bumpSatellitesVersion: () => set((s) => ({ satellitesVersion: s.satellitesVersion + 1 })),
   setAutoRotate: (enabled) => set({ autoRotate: enabled }),
@@ -97,7 +101,10 @@ export const useAppStore = create<AppState>((set) => ({
   setAltitudeFilter: (enabled) => set({ altitudeFilter: enabled }),
   setHudVisible: (visible) => set({ hudVisible: visible }),
   setISLPrediction: (enabled) => set({ islPrediction: enabled }),
-  setDemoLocation: (location) => set({ demoLocation: location }),
+  setDemoLocation: (location) => {
+    setDetectedPop(location?.pop ?? null);
+    set({ demoLocation: location });
+  },
   setCameraMode: (mode) => set({ cameraMode: mode }),
   setMobileHudTab: (tab) => set({ mobileHudTab: tab }),
 }));
