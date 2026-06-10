@@ -55,14 +55,27 @@ describe('fleet query functions', () => {
     expect(getRecordCount()).toBe(1);
   });
 
-  it('getRecentAltitudes returns ordered altitudes', () => {
+  it('getRecentAltitudes returns altitudes in chronological order (oldest first)', () => {
     insertTleSnapshot(makeSat({ epoch_ts: 1000, altitude_km: 300 }));
     insertTleSnapshot(makeSat({ epoch_ts: 2000, altitude_km: 400 }));
     insertTleSnapshot(makeSat({ epoch_ts: 3000, altitude_km: 500 }));
 
+    // classifySatelliteStatus appends the current altitude and reads the
+    // window oldest→newest (allIncreasing/allDecreasing) — newest-first
+    // ordering scrambles the trend so 'raising'/'deorbiting' never fire.
     const alts = getRecentAltitudes(44713, 3);
-    // Ordered by epoch_ts DESC → most recent first
-    expect(alts.map((a) => a.altitude_km)).toEqual([500, 400, 300]);
+    expect(alts.map((a) => a.altitude_km)).toEqual([300, 400, 500]);
+    expect(alts.map((a) => a.epoch_ts)).toEqual([1000, 2000, 3000]);
+  });
+
+  it('getRecentAltitudes keeps the N most recent rows when history exceeds the limit', () => {
+    insertTleSnapshot(makeSat({ epoch_ts: 1000, altitude_km: 300 }));
+    insertTleSnapshot(makeSat({ epoch_ts: 2000, altitude_km: 400 }));
+    insertTleSnapshot(makeSat({ epoch_ts: 3000, altitude_km: 500 }));
+    insertTleSnapshot(makeSat({ epoch_ts: 4000, altitude_km: 490 }));
+
+    const alts = getRecentAltitudes(44713, 3);
+    expect(alts.map((a) => a.altitude_km)).toEqual([400, 500, 490]);
   });
 
   describe('daily snapshots', () => {

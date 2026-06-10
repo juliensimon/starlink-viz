@@ -53,11 +53,14 @@ export function getRecentAltitudes(
   limit = 5
 ): { altitude_km: number; epoch_ts: number }[] {
   const db = getDatabase();
-  return db
+  const rows = db
     .prepare(
       'SELECT altitude_km, epoch_ts FROM tle_snapshots WHERE norad_id = ? ORDER BY epoch_ts DESC LIMIT ?'
     )
     .all(noradId, limit) as { altitude_km: number; epoch_ts: number }[];
+  // DESC picks the most recent N; classifySatelliteStatus needs them
+  // oldest→newest for its trend window.
+  return rows.reverse();
 }
 
 export function rebuildDailySnapshots(date: string): void {
