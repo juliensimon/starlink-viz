@@ -13,14 +13,15 @@ const HF_TLE_URL =
   'https://huggingface.co/datasets/juliensimon/starlink-tle-latest/resolve/main/data/starlink.tle';
 const CELESTRAK_FALLBACK_URL =
   'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle';
+const HF_GPS_URL =
+  'https://huggingface.co/datasets/juliensimon/starlink-tle-latest/resolve/main/data/gps.tle';
+const CELESTRAK_GPS_FALLBACK_URL =
+  'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle';
 
-/**
- * Fetch TLE data from HF dataset (CelesTrak fallback) and parse into structured objects.
- */
-export async function fetchTLEData(): Promise<TLEData[]> {
+async function fetchTLEFrom(primaryUrl: string, fallbackUrl: string): Promise<TLEData[]> {
   // Primary: HF dataset
   try {
-    const response = await fetch(HF_TLE_URL);
+    const response = await fetch(primaryUrl);
     if (response.ok) {
       const text = await response.text();
       const data = parseTLEText(text);
@@ -31,12 +32,26 @@ export async function fetchTLEData(): Promise<TLEData[]> {
   }
 
   // Fallback: CelesTrak
-  const response = await fetch(CELESTRAK_FALLBACK_URL);
+  const response = await fetch(fallbackUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch TLE data: ${response.status} ${response.statusText}`);
   }
   const text = await response.text();
   return parseTLEText(text);
+}
+
+/**
+ * Fetch Starlink TLE data from HF dataset (CelesTrak fallback) and parse into structured objects.
+ */
+export function fetchTLEData(): Promise<TLEData[]> {
+  return fetchTLEFrom(HF_TLE_URL, CELESTRAK_FALLBACK_URL);
+}
+
+/**
+ * Fetch GPS TLE data from HF dataset (CelesTrak fallback).
+ */
+export function fetchGpsTLEData(): Promise<TLEData[]> {
+  return fetchTLEFrom(HF_GPS_URL, CELESTRAK_GPS_FALLBACK_URL);
 }
 
 /**

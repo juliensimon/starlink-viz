@@ -1,3 +1,5 @@
+import { pivotTwoDigitYear } from '../satellites/tle-parse';
+
 /** Shape of a CelesTrak OMM JSON record */
 export interface OmmRecord {
   OBJECT_NAME: string;
@@ -32,8 +34,7 @@ export function filterStarlinkName(name: string): boolean {
  * Launch number is characters 2-5 parsed as integer.
  */
 export function parseLaunchInfo(intlDesig: string): { year: number; launch: number } {
-  const yy = parseInt(intlDesig.substring(0, 2), 10);
-  const year = yy >= 57 ? 1900 + yy : 2000 + yy;
+  const year = pivotTwoDigitYear(parseInt(intlDesig.substring(0, 2), 10));
   const launch = parseInt(intlDesig.substring(2, 5), 10);
   return { year, launch };
 }

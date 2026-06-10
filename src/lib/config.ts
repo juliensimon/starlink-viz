@@ -53,6 +53,28 @@ export const SHELL_ALT_BANDS: { minInc: number; maxInc: number; minAlt: number; 
   { minInc: 80, maxInc: 180, minAlt: 460, maxAlt: 600 }, // 97.6° — observed 550-590 km
 ];
 
+/** Canonical shell metadata, index-aligned with SHELL_ALT_BANDS and
+ *  SHELL_TARGETS. Single source for shell labels and colors — the 3D scene,
+ *  HandoffPanel, and /fleet all derive from this table. */
+export const SHELLS: { label: string; color: string }[] = [
+  { label: '33°',   color: '#eecc22' }, // warm gold
+  { label: '43°',   color: '#ff8844' }, // orange
+  { label: '53°',   color: '#6699ff' }, // blue — main shell
+  { label: '70°',   color: '#22ddbb' }, // teal-green
+  { label: '97.6°', color: '#ff4466' }, // pink-red — polar
+];
+
+/** Classify an inclination (degrees) into a shell index into SHELLS /
+ *  SHELL_ALT_BANDS. NaN and out-of-range fall back to the 33° bucket. */
+export function shellIndexForInclination(inclination: number): number {
+  for (let i = 0; i < SHELL_ALT_BANDS.length; i++) {
+    if (inclination >= SHELL_ALT_BANDS[i].minInc && inclination < SHELL_ALT_BANDS[i].maxInc) {
+      return i;
+    }
+  }
+  return 0;
+}
+
 /** FCC-authorized constellation targets per shell (Gen1 + Gen2 filings) */
 export const SHELL_TARGETS: Record<number, { target: number; label: string; altitude: string; planes: number; purpose: string }> = {
   0: { target: 2000, label: '33°', altitude: '525 km', planes: 72, purpose: 'Low-latitude fill' },

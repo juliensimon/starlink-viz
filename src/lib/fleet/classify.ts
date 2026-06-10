@@ -1,4 +1,4 @@
-import { isOperationalAltitude, SHELL_ALT_BANDS } from '@/lib/config';
+import { isOperationalAltitude, SHELL_ALT_BANDS, shellIndexForInclination } from '@/lib/config';
 
 export type SatelliteStatus =
   | 'operational'
@@ -90,11 +90,5 @@ export function classifySatelliteStatus(input: ClassifyInput): SatelliteStatus {
 }
 
 export function getShellId(inclination: number): number {
-  for (let i = 0; i < SHELL_ALT_BANDS.length; i++) {
-    const band = SHELL_ALT_BANDS[i];
-    if (inclination >= band.minInc && inclination < band.maxInc) {
-      return i;
-    }
-  }
-  return 2; // fallback to 53° shell
+  return shellIndexForInclination(inclination);
 }

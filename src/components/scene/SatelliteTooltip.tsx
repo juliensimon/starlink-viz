@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getTLEData, getPositionsArray } from '@/lib/satellites/satellite-store';
+import { parseLaunchInfoFromLine1 } from '@/lib/satellites/tle-parse';
 import { useAppStore } from '@/stores/app-store';
 
 export interface TooltipData {
@@ -21,14 +22,6 @@ function parseNoradId(line1: string): string {
   return line1.substring(2, 7).trim();
 }
 
-function parseLaunchInfo(line1: string): { year: number; launch: string } | null {
-  const intlDesig = line1.substring(9, 17).trim();
-  if (!intlDesig) return null;
-  const yy = parseInt(intlDesig.substring(0, 2), 10);
-  const year = yy >= 57 ? 1900 + yy : 2000 + yy;
-  const launch = intlDesig.substring(2, 5).trim();
-  return { year, launch };
-}
 
 function estimateAltitude(x: number, y: number, z: number): string {
   const dist = Math.sqrt(x * x + y * y + z * z);
@@ -133,7 +126,7 @@ export default function SatelliteTooltip() {
       const pi = bestIdx * 3;
       _projected.set(positions[pi], positions[pi + 1], positions[pi + 2]).project(camera);
 
-      const launch = parseLaunchInfo(tle.line1);
+      const launch = parseLaunchInfoFromLine1(tle.line1);
       dispatchTooltip({
         name: tle.name,
         noradId: parseNoradId(tle.line1),

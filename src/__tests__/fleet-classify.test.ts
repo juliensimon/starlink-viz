@@ -128,10 +128,11 @@ describe('getShellId', () => {
     expect(getShellId(97.6)).toBe(4);
   });
 
-  it('returns 2 as fallback for unknown inclination', () => {
-    // 150 falls within shell 4 (80-180). Use a value outside all bands.
-    // SHELL_ALT_BANDS covers 0-180, so all positive inclinations are covered.
-    // Test with a negative value to trigger fallback.
-    expect(getShellId(-1)).toBe(2);
+  it('falls back to shell 0 for out-of-range inclination', () => {
+    // SHELL_ALT_BANDS covers 0-180, so only negative/NaN values hit the
+    // fallback. getShellId now shares shellIndexForInclination with the
+    // scene and HUD, which all use the 33° bucket as the fallback.
+    expect(getShellId(-1)).toBe(0);
+    expect(getShellId(NaN)).toBe(0);
   });
 });

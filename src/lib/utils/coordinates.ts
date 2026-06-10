@@ -3,6 +3,8 @@
  * Globe uses a unit sphere (radius = 1).
  */
 
+import { EARTH_RADIUS_KM } from '../config';
+
 /**
  * Convert geodetic coordinates (lat/lon/alt) to 3D cartesian on the globe.
  * @param lat Latitude in radians
@@ -65,4 +67,25 @@ export function eciToGeodetic(
   const height = r / Math.cos(latitude) - N;
 
   return { latitude, longitude, height };
+}
+
+/**
+ * Smallest absolute difference between two angles in degrees, accounting
+ * for wraparound (359° and 1° are 2° apart, not 358°). Result in [0, 180].
+ */
+export function angularDeltaDeg(a: number, b: number): number {
+  const delta = Math.abs(a - b) % 360;
+  return delta > 180 ? 360 - delta : delta;
+}
+
+/** Haversine great-circle distance in km between two lat/lon points (degrees). */
+export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toRad;
+  const dLon = (lon2 - lon1) * toRad;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }

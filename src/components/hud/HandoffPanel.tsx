@@ -6,7 +6,7 @@ import { useHandoff } from '@/hooks/useHandoff';
 import { useAppStore } from '@/stores/app-store';
 import { getFullCatalog } from '@/lib/satellites/satellite-store';
 import { GROUND_STATIONS } from '@/lib/satellites/ground-stations';
-import { isOperationalAltitude } from '@/lib/config';
+import { isOperationalAltitude, SHELLS, shellIndexForInclination } from '@/lib/config';
 
 interface YearBreakdown {
   year: number;
@@ -22,23 +22,6 @@ interface ShellStats {
   years: YearBreakdown[];
 }
 
-// Ascending inclination order for display
-const SHELLS = [
-  { label: '33°', color: '#eecc22' },
-  { label: '43°', color: '#ff8844' },
-  { label: '53°', color: '#6699ff' },
-  { label: '70°', color: '#22ddbb' },
-  { label: '97.6°', color: '#ff4466' },
-];
-
-// Classify inclination into a shell index (matches SHELLS array order above)
-function shellIndex(inc: number): number {
-  if (inc >= 80) return 4;  // 97.6°
-  if (inc >= 60) return 3;  // 70°
-  if (inc >= 48) return 2;  // 53°
-  if (inc >= 38) return 1;  // 43°
-  return 0;                 // 33°
-}
 
 function getGSCounts() {
   const gateways = GROUND_STATIONS.filter((gs) => gs.type !== 'pop');
@@ -103,7 +86,7 @@ export default function HandoffPanel() {
 
     for (let i = 0; i < count; i++) {
       const inc = inclinations[i];
-      const si = shellIndex(inc);
+      const si = shellIndexForInclination(inc);
       const yr = launchYears[i];
       const isOp = isOperationalAltitude(inc, altitudes[i]);
 

@@ -5,6 +5,7 @@
 
 import type { TLEData } from './tle-fetcher';
 import type { SatRec, SatelliteOrbitalData } from './propagator';
+import { parseLaunchInfoFromLine1 } from './tle-parse';
 
 let tleData: TLEData[] = [];
 let satrecObjects: SatRec[] = [];
@@ -178,14 +179,9 @@ export function getNoradId(index: number): string {
   return tle.line1.substring(2, 7).trim();
 }
 
-/** Parse international designator from TLE line 1 (columns 9-16) → { year, launch, piece } */
+/** Parse international designator from TLE line 1 (columns 9-16) → { year, launch } */
 export function getLaunchInfo(index: number): { year: number; launch: string } | null {
   const tle = tleData[index];
   if (!tle) return null;
-  const intlDesig = tle.line1.substring(9, 17).trim();
-  if (!intlDesig) return null;
-  const yy = parseInt(intlDesig.substring(0, 2), 10);
-  const year = yy >= 57 ? 1900 + yy : 2000 + yy; // NORAD convention: 57-99 = 1957-1999, 00-56 = 2000-2056
-  const launch = intlDesig.substring(2, 5).trim();
-  return { year, launch };
+  return parseLaunchInfoFromLine1(tle.line1);
 }
