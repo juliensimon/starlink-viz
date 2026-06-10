@@ -148,6 +148,12 @@ export function normalizeName(name: string): string {
 export { haversineKm } from '../src/lib/utils/coordinates';
 import { haversineKm } from '../src/lib/utils/coordinates';
 
+/** True when two station lists are identical (loadExisting and reconcile
+ *  both produce the same key order, so JSON comparison is exact). */
+export function stationsEqual(a: Station[], b: Station[]): boolean {
+  return a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+}
+
 /**
  * Merge two status values. Operational wins over planned
  * (stations go operational, rarely reverse).
@@ -909,12 +915,17 @@ async function main() {
   const updatedMeta = updateMeta(meta, existing.stations, seenKeys, report);
   writeFileSync(META_PATH, JSON.stringify(updatedMeta, null, 2));
 
-  // Write updated data
-  const output: DataFile = {
-    lastUpdated: new Date().toISOString(),
-    stations,
-  };
-  writeFileSync(DATA_PATH, JSON.stringify(output, null, 2));
+  // Write updated data — but only when stations actually changed, so the
+  // weekly workflow doesn't open a timestamp-only PR on no-op runs.
+  if (stationsEqual(stations, existing.stations)) {
+    console.log('\nNo station changes — leaving data/ground-stations.json untouched.');
+  } else {
+    const output: DataFile = {
+      lastUpdated: new Date().toISOString(),
+      stations,
+    };
+    writeFileSync(DATA_PATH, JSON.stringify(output, null, 2));
+  }
 
   // Write change report
   writeReport(report);

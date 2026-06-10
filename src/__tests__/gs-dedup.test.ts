@@ -7,7 +7,7 @@
  * routing, silently dropping the gateway after the weekly auto-update.
  */
 import { describe, it, expect } from 'vitest';
-import { dedupNearbyStations, type Station } from '../../scripts/update-ground-stations';
+import { dedupNearbyStations, stationsEqual, type Station } from '../../scripts/update-ground-stations';
 
 function station(overrides: Partial<Station>): Station {
   return {
@@ -56,5 +56,25 @@ describe('dedupNearbyStations', () => {
       station({ name: 'London, UK', lat: 51.5, lon: -0.13 }),
     ]);
     expect(result.length).toBe(2);
+  });
+});
+
+describe('stationsEqual', () => {
+  // Bug history: the script rewrote data/ground-stations.json with a fresh
+  // lastUpdated on every run, so the weekly workflow opened a timestamp-only
+  // PR even when no station changed.
+  it('treats identical station lists as equal', () => {
+    const a = [station({ name: 'A' }), station({ name: 'B', lat: 41 })];
+    const b = [station({ name: 'A' }), station({ name: 'B', lat: 41 })];
+    expect(stationsEqual(a, b)).toBe(true);
+  });
+
+  it('detects any field change', () => {
+    expect(stationsEqual([station({})], [station({ status: 'planned' })])).toBe(false);
+    expect(stationsEqual([station({})], [station({ lat: 40.001 })])).toBe(false);
+  });
+
+  it('detects added/removed stations', () => {
+    expect(stationsEqual([station({})], [station({}), station({ name: 'X' })])).toBe(false);
   });
 });
