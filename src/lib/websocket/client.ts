@@ -3,7 +3,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useTelemetryStore } from '@/stores/telemetry-store';
 import { useAppStore } from '@/stores/app-store';
-import type { WSMessage, DishStatus, DishHistory, HandoffEvent, EventLogEntry } from './types';
+import type { WSMessage, DishStatus, DishHistory } from './types';
+import { isStatusMessage, isHistoryMessage, isHandoffMessage, isEventMessage } from './protocol';
 
 const setWsConnected = (connected: boolean) => useAppStore.getState().setWsConnected(connected);
 
@@ -34,7 +35,11 @@ export function useWebSocket(): UseWebSocketReturn {
 
         switch (msg.type) {
           case 'status': {
-            const status = msg.data as DishStatus;
+            if (!isStatusMessage(msg)) {
+              console.warn('[WS] Malformed status message dropped', msg);
+              break;
+            }
+            const status = msg.data;
             setDishStatus(status);
 
             // Detect demo mode from device ID immediately (not deferred)
@@ -73,13 +78,20 @@ export function useWebSocket(): UseWebSocketReturn {
           }
 
           case 'history': {
-            const history = msg.data as DishHistory;
-            setDishHistory(history);
+            if (!isHistoryMessage(msg)) {
+              console.warn('[WS] Malformed history message dropped', msg);
+              break;
+            }
+            setDishHistory(msg.data);
             break;
           }
 
           case 'handoff': {
-            const handoff = msg.data as HandoffEvent;
+            if (!isHandoffMessage(msg)) {
+              console.warn('[WS] Malformed handoff message dropped', msg);
+              break;
+            }
+            const handoff = msg.data;
             addEvent({
               timestamp: Date.now(),
               message: `Handoff: az ${handoff.previousAzimuth.toFixed(1)}\u00B0 \u2192 ${handoff.newAzimuth.toFixed(1)}\u00B0, el ${handoff.previousElevation.toFixed(1)}\u00B0 \u2192 ${handoff.newElevation.toFixed(1)}\u00B0`,
@@ -89,7 +101,11 @@ export function useWebSocket(): UseWebSocketReturn {
           }
 
           case 'event': {
-            const entry = msg.data as EventLogEntry;
+            if (!isEventMessage(msg)) {
+              console.warn('[WS] Malformed event message dropped', msg);
+              break;
+            }
+            const entry = msg.data;
             addEvent({
               timestamp: entry.timestamp,
               message: entry.message,

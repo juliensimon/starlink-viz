@@ -13,6 +13,7 @@ import {
 } from './src/lib/websocket/protocol';
 import type { DishStatus } from 'starlink-dish';
 import { parsePopHostname } from './src/lib/utils/pop';
+import { angularDeltaDeg } from './src/lib/utils/coordinates';
 import { runTraceroute } from './src/lib/utils/traceroute';
 
 const execFileAsync = promisify(execFile);
@@ -31,6 +32,9 @@ const handle = app.getRequestHandler();
 
 let useDemoMode = false;
 let mockInstalled = false;
+// Bumped on every mode switch; in-flight polls from the old mode check it
+// after each await and drop their (possibly mock) result.
+let modeGeneration = 0;
 let previousStatus: DishStatus | null = null;
 let statusInterval: ReturnType<typeof setInterval> | null = null;
 let historyInterval: ReturnType<typeof setInterval> | null = null;
@@ -111,7 +115,8 @@ function detectHandoff(current: DishStatus): void {
     return;
   }
 
-  const azDelta = Math.abs(current.boresightAzimuthDeg - previousStatus.boresightAzimuthDeg);
+  // Azimuth wraps at 0°/360° — a dish crossing north is not a handoff
+  const azDelta = angularDeltaDeg(current.boresightAzimuthDeg, previousStatus.boresightAzimuthDeg);
   const elDelta = Math.abs(current.boresightElevationDeg - previousStatus.boresightElevationDeg);
 
   if (azDelta > HANDOFF_THRESHOLD_DEG || elDelta > HANDOFF_THRESHOLD_DEG) {
@@ -138,12 +143,16 @@ function detectHandoff(current: DishStatus): void {
 
 async function pollStatus(): Promise<void> {
   let status: DishStatus | null = null;
+  const generation = modeGeneration;
 
   if (useDemoMode && !mockInstalled) {
     useMock();
     mockInstalled = true;
   }
   status = await getStatus();
+  // A mode switch happened while we were awaiting \u2014 this status belongs to
+  // the old mode (e.g. mock data after switching to live). Drop it.
+  if (generation !== modeGeneration) return;
   if (!useDemoMode && !status) {
     // Dish became unreachable, fallback to demo mode
     console.warn('\u26A0\uFE0F Dish unreachable, falling back to demo mode');
@@ -151,6 +160,7 @@ async function pollStatus(): Promise<void> {
     useMock();
     mockInstalled = true;
     status = await getStatus();
+    if (generation !== modeGeneration) return;
   }
 
   if (status) {
@@ -211,14 +221,27 @@ async function main() {
       return;
     }
     if (req.url === '/api/mode' && req.method === 'POST') {
+      const MAX_BODY_BYTES = 1024;
       let body = '';
-      req.on('data', (chunk) => { body += chunk; });
+      let tooLarge = false;
+      req.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > MAX_BODY_BYTES && !tooLarge) {
+          tooLarge = true;
+          res.writeHead(413);
+          res.end('Payload too large');
+          req.destroy();
+        }
+      });
       req.on('end', async () => {
+        if (tooLarge) return;
         try {
           const { mode } = JSON.parse(body);
           if (mode === 'demo') {
             useDemoMode = true;
             mockInstalled = false;
+            modeGeneration++;
+            previousStatus = null; // stale live boresight must not seed handoff detection
             closeClient();
             console.log('\u{1F3AD} Switched to DEMO mode');
             broadcast(createEventMessage({
@@ -226,10 +249,12 @@ async function main() {
             }));
           } else if (mode === 'live') {
             console.log(`\u{1F4E1} Switching to LIVE mode, connecting to ${dishAddress}...`);
-            mockInstalled = false;
             const connected = await initClient(dishAddress);
             if (connected) {
               useDemoMode = false;
+              mockInstalled = false;
+              modeGeneration++;
+              previousStatus = null; // first live status starts a fresh handoff baseline
               console.log(`\u{1F4E1} Connected to dish at ${dishAddress}`);
               broadcast(createEventMessage({
                 timestamp: Date.now(), message: `Live mode \u2014 connected to ${dishAddress}`, type: 'info',
