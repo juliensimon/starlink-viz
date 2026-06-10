@@ -120,21 +120,27 @@ export default function SkyTooltip() {
     let bestIdx = -1;
     let bestDistSq = MAX_PICK_DISTANCE_PX * MAX_PICK_DISTANCE_PX;
 
-    // We need to project dome positions (not orbital positions) to screen
-    // Recompute az/el and dome position for each candidate
+    // We need to project dome positions (not orbital positions) to screen.
+    // The dome direction is the normalized observer→satellite vector — no
+    // az/el round-trip needed in this ~7,500-iteration mousemove loop.
     for (let i = 0; i < count; i++) {
       const pi = i * 3;
       const x = positions[pi], y = positions[pi + 1], z = positions[pi + 2];
       if (x === 0 && y === 0 && z === 0) continue;
 
-      const { az, el } = computeAzElFrom(frame, x, y, z);
-      if (el < 0) continue;
+      const dx = x - frame.pos.x;
+      const dy = y - frame.pos.y;
+      const dz = z - frame.pos.z;
+      const dLen = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dLen < 1e-10) continue;
+      // Below horizon — skip
+      if (dx * frame.normal.x + dy * frame.normal.y + dz * frame.normal.z < 0) continue;
 
-      const dir = azElToDirection3D(frame, az, el);
+      const s = DOME_RADIUS / dLen;
       _projected.set(
-        frame.pos.x + dir.x * DOME_RADIUS,
-        frame.pos.y + dir.y * DOME_RADIUS,
-        frame.pos.z + dir.z * DOME_RADIUS
+        frame.pos.x + dx * s,
+        frame.pos.y + dy * s,
+        frame.pos.z + dz * s
       ).project(camera);
 
       if (_projected.z > 1) continue;

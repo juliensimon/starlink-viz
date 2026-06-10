@@ -34,6 +34,10 @@ export default function Satellites() {
   const batchIndexRef = useRef(0);
   const colorsRef = useRef<Float32Array | null>(null);
   const colorUpdateRef = useRef(0);
+  // Per-satellite color state (0 = dim shell color, 1 = in steering cone).
+  // Lets the periodic color pass upload only the instances that actually
+  // changed instead of the whole 10,000×3-float buffer 10×/sec.
+  const colorStatesRef = useRef<Uint8Array | null>(null);
   const connectedSatelliteIndex = useAppStore((s) => s.connectedSatelliteIndex);
   const satellitesLoaded = useAppStore((s) => s.satellitesLoaded);
   const satellitesVersion = useAppStore((s) => s.satellitesVersion);
@@ -98,8 +102,11 @@ export default function Satellites() {
       colorArr[i * 3 + 1] = dim.g;
       colorArr[i * 3 + 2] = dim.b;
     }
-    (mesh.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true;
+    const initColorAttr = mesh.instanceColor as THREE.InstancedBufferAttribute;
+    initColorAttr.clearUpdateRanges(); // full upload — drop any narrow range left by the color pass
+    initColorAttr.needsUpdate = true;
     colorsRef.current = colorArr;
+    colorStatesRef.current = null; // force the color pass to re-derive cone state
 
     // Set initial positions
     for (let i = 0; i < count; i++) {
@@ -136,7 +143,9 @@ export default function Satellites() {
       colors[ci + 2] = BRIGHT_COLOR.b;
     }
 
-    (m.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true;
+    const connColorAttr = m.instanceColor as THREE.InstancedBufferAttribute;
+    connColorAttr.clearUpdateRanges(); // full upload for this one-off change
+    connColorAttr.needsUpdate = true;
     prevConnectedRef.current = connectedSatelliteIndex;
   }, [connectedSatelliteIndex]);
 
@@ -204,6 +213,15 @@ export default function Satellites() {
       const boreY = boresightDir.y;
       const boreZ = boresightDir.z;
 
+      // Cone membership rarely changes — write (and upload) only what flipped.
+      let states = colorStatesRef.current;
+      if (!states || states.length !== count) {
+        states = new Uint8Array(count).fill(255); // 255 = unknown, forces first write
+        colorStatesRef.current = states;
+      }
+      let minDirty = Infinity;
+      let maxDirty = -1;
+
       for (let i = 0; i < count; i++) {
         if (i === connectedIdx) continue;
 
@@ -223,8 +241,12 @@ export default function Satellites() {
 
           const sdx = dx / dLen, sdy = dy / dLen, sdz = dz / dLen;
           const bDot = sdx * boreX + sdy * boreY + sdz * boreZ;
+          const inCone = operational && bDot > MAX_STEER_COS ? 1 : 0;
+          if (states[i] === inCone) continue;
+          states[i] = inCone;
+
           const ci = i * 3;
-          if (operational && bDot > MAX_STEER_COS) {
+          if (inCone) {
             colors[ci] = CONE_COLOR.r;
             colors[ci + 1] = CONE_COLOR.g;
             colors[ci + 2] = CONE_COLOR.b;
@@ -235,10 +257,17 @@ export default function Satellites() {
             colors[ci + 1] = dim.g;
             colors[ci + 2] = dim.b;
           }
+          if (ci < minDirty) minDirty = ci;
+          if (ci + 3 > maxDirty) maxDirty = ci + 3;
         }
       }
 
-      (m.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true;
+      if (maxDirty >= 0) {
+        const colorAttr = m.instanceColor as THREE.InstancedBufferAttribute;
+        colorAttr.clearUpdateRanges();
+        colorAttr.addUpdateRange(minDirty, maxDirty - minDirty);
+        colorAttr.needsUpdate = true;
+      }
     }
 
     batchIndexRef.current = (batchIdx + 1) % NUM_BATCHES;
