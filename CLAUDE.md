@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Update ground stations data**: `npm run update-gs` (multi-source: starlinkinsider.com + starlink.sx + PoP list)
 - **Type check**: `npx tsc --noEmit` (runs in CI before tests)
 - No linter or formatter is configured
+- If fleet DB tests fail with `NODE_MODULE_VERSION` mismatch: `npm rebuild better-sqlite3`
 
 ## Architecture
 
@@ -28,11 +29,11 @@ Custom HTTP server wrapping Next.js that handles:
 
 ### API Routes (`src/app/api/`)
 
-- `/api/tle` — Starlink TLE data from HF dataset `juliensimon/starlink-tle-latest` (CelesTrak fallback, 6h cache)
-- `/api/tle-gps` — GPS TLE data from HF dataset `juliensimon/starlink-tle-latest` (CelesTrak fallback, 6h cache)
-- `/api/ground-stations` — gateway catalog from HF dataset `juliensimon/starlink-ground-stations` (via `refreshGroundStations()`)
+- `/api/tle` — Starlink TLE data from HF dataset `juliensimon/starlink-tle-latest` (CelesTrak fallback)
+- `/api/tle-gps` — GPS TLE data, same dataset/fallback. Both TLE routes share `createCachedTleHandler()` in `src/lib/satellites/tle-route-cache.ts` (6h cache, stale-on-error with short max-age)
+- `/api/ground-stations` — gateway catalog from HF dataset `juliensimon/starlink-ground-stations` (via `refreshGroundStations()`); the 24h staleness timestamp only advances on a successful refresh, so failures retry on the next request
 - `/api/pop` — public IP + rDNS PoP city detection (5m cache)
-- `/api/isl-log` — ISL route decision log (GET last 100 lines / POST append)
+- `/api/isl-log` — ISL route decision log (GET last 100 lines / POST append). POST is schema-validated (route-decision shape, 8KB entry cap); log rotates at 5MB keeping newest 1,000 lines; path overridable via `ISL_LOG_PATH` (used by tests)
 - `/api/mode` — GET/POST runtime demo/live mode switching (handled in `server.ts`, not Next.js)
 
 ### Frontend
@@ -87,21 +88,21 @@ The app models inter-satellite laser links (ISL) for realistic route prediction:
 
 - **ISL capability** (`isl-capability.ts`) — heuristic: polar shells always, 53° from 2022, 43° from 2023, 33° from 2024
 - **ISL graph** (`isl-graph.ts`) — CSR neighbor graph, 4 terminals per sat (2 in-plane, 2 cross-plane), polar exclusion at ±70° latitude
-- **Pathfinder** (`src/lib/utils/isl-pathfinder.ts`) — PoP-constrained GS selection with line-of-sight check. ISL routes only explored when no valid GS is directly visible (mandatory ISL). Routes held for 30s with LoS validity check
-- **Backhaul** (`src/lib/utils/backhaul-latency.ts`) — per-gateway RTT estimate from haversine distance to nearest IXP at 0.67c with 1.4× fiber route factor
+- **Pathfinder** (`src/lib/utils/isl-pathfinder.ts`) — PoP-constrained GS selection. Every route (including all fallbacks) requires line-of-sight; `findBestRoute()` returns null when no GS is visible — never a through-the-Earth route. ISL routes only explored when no valid GS is directly visible (mandatory ISL). Routes held for 30s with LoS validity check; held routes are invalidated on `groundStationsVersion` change and on satellite catalog rebuilds (`resetRouteState()`, called by SatellitePropagator). Behavioral tests in `src/__tests__/isl-pathfinder-route.test.ts` drive it with synthetic stations/satellites via `applyStations()` + satellite-store setters
+- **Backhaul** (`src/lib/utils/backhaul-latency.ts`) — per-gateway RTT estimate from haversine distance to nearest IXP at 0.67c with 1.4× fiber route factor. Exposed as `getBackhaulRTT()`, lazily recomputed on `groundStationsVersion` change (works on both server and client — there is no precomputed array)
 - **PoP constraint** — detected via rDNS on public IP (`/api/pop`), stored in satellite-store, limits GS candidates to those within 1,500km of the PoP
 - **Latency model** — speed-of-light geometry + 6ms base processing RTT + 0.3ms OEO per ISL hop + per-GS backhaul
 - **Route log** — decisions written to `isl-route.log` and `window.__ISL_ROUTE_LOG` for debugging
 - **Toggle** — `islPrediction` in app-store, green pill-switch in ViewControls
-- **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint
+- **Demo locations** — 5 remote locations (Iceland Gap, N/Mid Atlantic, Gulf of Mexico, Celtic Sea) where ISL is mandatory. Dropdown in ViewControls (demo mode only). Iceland Gap is the default. Selecting a location overrides dish position, satellite selection, and PoP constraint. The PoP constraint (`detectedPop` in satellite-store) is owned by the app-store demo actions: `setDemoMode`/`setDemoLocation` set it on enter/switch and clear it on exit; the rDNS fetcher never overwrites an active demo location
 
 ### Ground Stations (HF dataset)
 
-Loaded exclusively from HF dataset [`juliensimon/starlink-ground-stations`](https://huggingface.co/datasets/juliensimon/starlink-ground-stations) (gateways config). `GROUND_STATIONS` starts empty and is populated via `refreshGroundStations()`: server-side fetches from HF API directly, client-side fetches from `/api/ground-stations`. All derived data (3D positions in `GroundStations.tsx`/`ConnectionBeam.tsx`, backhaul RTT, ISL pathfinder arrays) uses lazy recomputation via `groundStationsVersion` counter. Stations have `type` field (`'gateway'` | `'pop'`) and `status` field (`'operational'` | `'planned'`). Planned stations are rendered with reduced opacity. Both planned and PoP entries are **excluded from gateway selection routing** in `isl-pathfinder.ts`.
+Loaded exclusively from HF dataset [`juliensimon/starlink-ground-stations`](https://huggingface.co/datasets/juliensimon/starlink-ground-stations) (gateways config). `GROUND_STATIONS` starts empty and is populated via `refreshGroundStations()` (returns `boolean` success): server-side fetches from HF API directly, client-side fetches from `/api/ground-stations` and retries with backoff on failure. Tests populate it synthetically via `applyStations(stations)`. All derived data (3D positions in `GroundStations.tsx`/`ConnectionBeam.tsx`, backhaul RTT, ISL pathfinder arrays incl. its held route) uses lazy recomputation via the `groundStationsVersion` counter — any new consumer caching derived station data must watch it. Stations have `type` field (`'gateway'` | `'pop'`) and `status` field (`'operational'` | `'planned'`). Planned stations are rendered with reduced opacity. Both planned and PoP entries are **excluded from gateway selection routing** in `isl-pathfinder.ts`.
 
-The offline update script (`npm run update-gs`) reconciles data from multiple sources (starlinkinsider.com, starlink.sx, PoP list) and writes to `data/ground-stations.json` as a backup. Runtime loading uses HF exclusively.
+The offline update script (`npm run update-gs`) reconciles data from multiple sources (starlinkinsider.com, starlink.sx, PoP list) and writes to `data/ground-stations.json` as a backup. Runtime loading uses HF exclusively. The 5km dedup never merges across `type` (a co-located PoP must not replace a routable gateway), and the script leaves the data file untouched when stations are unchanged (`stationsEqual`) so no-op runs don't churn `lastUpdated`.
 
-**Auto-update workflow** (`.github/workflows/update-ground-stations.yml`): runs weekly Monday 06:00 UTC, fetches from all sources, reconciles (name normalization, coordinate dedup within 5km, status merge, sanity checks), runs tests, and opens a PR if data changed. Uses `data/ground-stations-meta.json` for `lastSeen` tracking (gitignored).
+**Auto-update workflow** (`.github/workflows/update-ground-stations.yml`): runs weekly Monday 06:00 UTC, fetches from all sources, reconciles (name normalization, coordinate dedup within 5km, status merge, sanity checks), runs tests, and opens a PR only if data changed. Uses `data/ground-stations-meta.json` for `lastSeen` tracking (gitignored). PR creation requires the repo setting "Allow GitHub Actions to create and approve pull requests".
 
 ### Fleet Monitor (`/fleet`)
 
@@ -118,10 +119,11 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 
 ### Sky View Utilities
 
-- `src/lib/utils/observer-frame.ts` — parameterized ENU (East-North-Up) frame from lat/lon, with `computeAzElFrom()` and `azElToDirection3D()`. Handles pole degeneracy with X-axis fallback
+- `src/lib/utils/observer-frame.ts` — parameterized ENU (East-North-Up) frame from lat/lon, with `computeAzElFrom()` and `azElToDirection3D()`. Handles pole degeneracy with X-axis fallback. This is the ONLY ENU az/el implementation — `dish-frame.ts` is a thin wrapper with the dish lat/lon baked in
 - `src/lib/utils/sun-shadow.ts` — cylindrical Earth shadow model: `isSatelliteSunlit()` and `isSunBelowHorizon()` for observer darkness detection
 - `src/lib/utils/star-coordinates.ts` — RA/Dec (J2000) to Az/El horizontal coordinate transform using GMST from `satellite.gstime()`
-- `src/lib/utils/shell-colors.ts` — shared `getDimColor()` extracted from Satellites.tsx, used by both Space and Sky view renderers
+- `src/lib/utils/shell-colors.ts` — `getDimColor()` for the 3D renderers; THREE.Color instances derived from the canonical `SHELLS` palette in config.ts
+- In render loops, the dome direction is `normalize(satPos − observer.pos)` — don't round-trip through `computeAzElFrom` → `azElToDirection3D` (identity, ~6 trig calls + 2 allocations per satellite); compute az/el only for a selected satellite
 - `src/data/bright-stars.ts` — embedded catalog of ~500 stars (mag ≤ 4.0) with J2000 RA/Dec, magnitude, B-V color index
 - `src/data/constellations.ts` — 88 IAU constellation stick figures with line segment coordinates and label positions
 
@@ -130,9 +132,12 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 - Path alias: `@/` maps to `src/`
 - The 3D scene uses a unit sphere for Earth (radius = 1); satellite altitude is mapped as `1 + altKm / 6371`
 - Coordinate system: X = cos(lat)cos(lon), Y = sin(lat), Z = -cos(lat)sin(lon)
-- 5 orbital shells color-coded by inclination: 33° (gold), 43° (orange), 53° (blue), 70° (teal), 97.6° (pink-red). Classification in `getDimColor()` in `src/lib/utils/shell-colors.ts` must stay in sync with `shellIndex()` in `HandoffPanel.tsx` and `SHELL_ALT_BANDS` in `config.ts`
+- Shared single-source utilities — extend these, don't re-implement: `haversineKm()` and `angularDeltaDeg()` in `src/lib/utils/coordinates.ts` (the update script re-exports haversineKm); TLE designator parsing (`parseLaunchYear`, `parseLaunchInfoFromLine1`, NORAD 2-digit-year pivot) in `src/lib/satellites/tle-parse.ts`
+- 5 orbital shells color-coded by inclination: 33° (gold), 43° (orange), 53° (blue), 70° (teal), 97.6° (pink-red). Single source: the `SHELLS` table + `shellIndexForInclination()` in `config.ts` (index-aligned with `SHELL_ALT_BANDS`/`SHELL_TARGETS`) drive the 3D scene, HandoffPanel, /fleet charts, and fleet classification; `src/__tests__/shell-classification.test.ts` pins the derivations together. Adding a shell = one row in `SHELLS` + one band in `SHELL_ALT_BANDS`
 - Camera mode toggled via `cameraMode` ('space' | 'sky') in app-store. Space/Sky toggle in ViewControls. `SatellitePropagator` and `ConnectionBeam` always mounted; visual components conditionally rendered
-- WebSocket protocol uses typed messages (`status`, `history`, `handoff`, `event`) defined in `src/lib/websocket/types.ts` with type guards in `src/lib/websocket/protocol.ts`
+- WebSocket protocol uses typed messages (`status`, `history`, `handoff`, `event`) defined in `src/lib/websocket/types.ts` with type guards in `src/lib/websocket/protocol.ts`. The guards validate the data fields consumers dereference (not just `msg.type`) and the client must use them — malformed messages are dropped with a warning, never cast raw
+- Satellite catalog rebuilds (TLE refresh, altitude-filter toggle) re-meaning all satellite indices: `SatellitePropagator` clears `connectedSatelliteIndex`, the current route, and the pathfinder's held route, then bumps `satellitesVersion`. Any new consumer holding satellite indices across frames must do the same
+- Instanced-mesh color passes (Satellites, SkySatellites) track per-instance state and upload only dirty ranges via `addUpdateRange`; one-off full rewrites must `clearUpdateRanges()` first
 - Dish location configured via `NEXT_PUBLIC_DISH_LAT` and `NEXT_PUBLIC_DISH_LON` env vars (defaults to 48.860, 2.350)
 - Scene is dynamically imported with SSR disabled (`next/dynamic`)
 - React strict mode is off (`reactStrictMode: false` in next.config.ts)
@@ -155,4 +160,5 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 ### CI
 
 - **CI** (`.github/workflows/ci.yml`): `tsc --noEmit` → `npm test` → `npm run build` on Node 20+22, triggered on push/PR to master
-- **Ground station updates** (`.github/workflows/update-ground-stations.yml`): weekly Monday 06:00 UTC + manual dispatch. Fetches sources → reconciles → tests → opens PR via `peter-evans/create-pull-request`
+- **Ground station updates** (`.github/workflows/update-ground-stations.yml`): weekly Monday 06:00 UTC + manual dispatch (`gh workflow run update-ground-stations.yml`). Fetches sources → reconciles → tests → opens PR via `peter-evans/create-pull-request` only when data changed
+- Actions are pinned to Node 24-compatible majors (`checkout@v6`, `setup-node@v6`, `create-pull-request@v8`) — GitHub removed Node 20 action support in 2026
