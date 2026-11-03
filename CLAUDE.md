@@ -138,7 +138,7 @@ Separate page tracking Starlink constellation health over time using NORAD TLE d
 - WebSocket protocol uses typed messages (`status`, `history`, `handoff`, `event`) defined in `src/lib/websocket/types.ts` with type guards in `src/lib/websocket/protocol.ts`. The guards validate the data fields consumers dereference (not just `msg.type`) and the client must use them — malformed messages are dropped with a warning, never cast raw
 - Satellite catalog rebuilds (TLE refresh, altitude-filter toggle) re-meaning all satellite indices: `SatellitePropagator` clears `connectedSatelliteIndex`, the current route, and the pathfinder's held route, then bumps `satellitesVersion`. Any new consumer holding satellite indices across frames must do the same
 - Instanced-mesh color passes (Satellites, SkySatellites) track per-instance state and upload only dirty ranges via `addUpdateRange`; one-off full rewrites must `clearUpdateRanges()` first
-- Dish location configured via `NEXT_PUBLIC_DISH_LAT` and `NEXT_PUBLIC_DISH_LON` env vars (defaults to 48.860, 2.350)
+- Dish location configured via `NEXT_PUBLIC_DISH_LAT` and `NEXT_PUBLIC_DISH_LON` env vars (defaults to 48.860, 2.350, central Paris, a demo location)
 - Scene is dynamically imported with SSR disabled (`next/dynamic`)
 - React strict mode is off (`reactStrictMode: false` in next.config.ts)
 - Tests live in `src/__tests__/` and run in Node environment (vitest)

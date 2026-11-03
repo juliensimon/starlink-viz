@@ -73,3 +73,7 @@ data/ground-stations-update-report.md
 data/ground-stations-meta.json
 .worktrees/
 isl-route.log
+
+# Demo media and runtime logs stay out of the repo
+*.mov
+docs/*.gif

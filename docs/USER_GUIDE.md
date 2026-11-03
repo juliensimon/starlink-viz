@@ -26,7 +26,7 @@ DEMO_MODE=auto
 # Dish gRPC address (default: 192.168.100.1:9200)
 DISH_ADDRESS=192.168.100.1:9200
 
-# Dish location (latitude/longitude in degrees)
+# Dish location (latitude/longitude in degrees; default is central Paris, a demo location)
 NEXT_PUBLIC_DISH_LAT=48.860
 NEXT_PUBLIC_DISH_LON=2.350
 

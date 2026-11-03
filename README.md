@@ -77,7 +77,7 @@ DISH_ADDRESS=192.168.100.1:9200 npm run dev
 # Force demo mode (no dish required)
 DEMO_MODE=true npm run dev
 
-# Custom dish location (defaults to 48.860°N, 2.350°E)
+# Custom dish location (defaults to 48.860°N, 2.350°E, central Paris, a demo location)
 NEXT_PUBLIC_DISH_LAT=37.7749 NEXT_PUBLIC_DISH_LON=-122.4194 npm run dev
 ```
 
